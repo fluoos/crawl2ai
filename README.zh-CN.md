@@ -14,19 +14,48 @@
 ## 项目结构
 
 ```
-├── export_dataset.py     # 后端实现（Flask API）
+├── backend/               # 后端实现
+│   ├── requirements.txt   # Python依赖文件
+│   ├── .env               # 配置文件
+│   ├── src/               # 源代码目录
+│   │   ├── crawl_to_file.py      # 爬虫到文件转换实现
+│   │   ├── export_dataset.py     # 数据集导出API实现
+│   │   ├── file_to_dataset.py    # 文件到数据集转换实现
+│   │   ├── simple_crawler.py     # 简单爬虫实现
+│   │   └── clean_failed_files.py # 清理失败文件工具
+│   └── tests/             # 测试目录
 ├── frontend/             # 前端实现（Vue3 + Ant Design）
-│   ├── index.html
-│   ├── package.json
-│   ├── vite.config.js
-│   └── src/
-│       ├── main.js
-│       ├── App.vue
-│       ├── api.js
-│       └── style.css
+│   ├── index.html        # HTML入口文件
+│   ├── package.json      # 前端依赖配置
+│   ├── vite.config.js    # Vite配置文件
+│   └── src/              # 前端源代码
+│       ├── main.js       # 主入口文件
+│       ├── App.vue       # 主应用组件
+│       ├── components/   # 组件目录
+│       │   ├── Crawler.vue      # 爬虫配置组件
+│       │   ├── Converter.vue    # 转换配置组件
+│       │   └── Export.vue       # 导出配置组件
+│       ├── api.js        # API调用封装
+│       └── style.css     # 全局样式
+├── data/                 # 数据目录
+│   ├── raw/              # 原始爬取数据
+│   └── markdown/         # 转换后的markdown文件
 ├── output/               # 输入文件目录
-│   └── qa_dataset.jsonl  # 原始QA数据
-└── export/               # 输出文件目录
+│   ├── qa_dataset.jsonl  # 原始QA数据
+│   └── crawled_urls.txt  # 爬取的URL列表
+├── export/               # 输出文件目录
+│   ├── alpaca/           # Alpaca格式输出
+│   ├── sharegpt/         # ShareGPT格式输出
+│   └── custom/           # 自定义格式输出
+├── upload/               # 上传文件目录
+├── config/               # 配置文件目录
+│   ├── crawler.yaml      # 爬虫配置
+│   └── export.yaml       # 导出配置
+├── .env.example          # 环境变量示例文件
+├── .gitignore            # Git忽略文件配置
+├── LICENSE               # 许可证文件
+├── README.md             # 英文说明文档
+└── README.zh-CN.md       # 中文说明文档
 ```
 
 ## 快速开始

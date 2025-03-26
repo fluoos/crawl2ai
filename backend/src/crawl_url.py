@@ -6,8 +6,11 @@ from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, CacheMode
 from crawl4ai.deep_crawling import BFSDeepCrawlStrategy
 from crawl4ai.content_scraping_strategy import LXMLWebScrapingStrategy
 
+# 获取项目根目录
+BASE_DIR = Path(__file__).parent.parent.parent
+
 # 确保输出目录存在
-output_dir = Path("output")
+output_dir = BASE_DIR / "output"
 output_dir.mkdir(exist_ok=True)
 output_file = output_dir / "crawled_urls.json"
 output_txt_file = output_dir / "crawled_urls.txt"

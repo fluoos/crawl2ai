@@ -4,6 +4,9 @@ from pathlib import Path
 from urllib.parse import urlparse
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, CacheMode, DisplayMode, BrowserConfig, MemoryAdaptiveDispatcher, CrawlerMonitor
 
+# 获取项目根目录
+BASE_DIR = Path(__file__).parent.parent.parent
+
 def process_url(url):
     """处理URL，确保使用https协议"""
     if url.startswith('http://'):
@@ -28,17 +31,17 @@ def get_existing_files(upload_dir):
     return existing_files
 
 async def main():
-    # 创建upload目录
-    upload_dir = Path("upload")
+    # 创建upload目录，使用绝对路径
+    upload_dir = BASE_DIR / "upload"
     upload_dir.mkdir(exist_ok=True)
     
     # 获取已存在的文件列表
     existing_files = get_existing_files(upload_dir)
     print(f"发现 {len(existing_files)} 个已存在的markdown文件")
     
-    # 读取URL文件
+    # 读取URL文件，使用绝对路径
     urls = set()
-    url_file = Path("output/crawled_urls.txt")
+    url_file = BASE_DIR / "output" / "crawled_urls.txt"
     if url_file.exists():
         with open(url_file, 'r', encoding='utf-8') as f:
             for line in f:

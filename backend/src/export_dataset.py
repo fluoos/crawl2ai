@@ -34,9 +34,10 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 CORS(app)  # 启用跨域支持
 
-# 常量定义
-INPUT_FILE = "output/qa_dataset.jsonl"
-OUTPUT_DIR = "export"
+# 常量定义 - 调整路径以适应新的项目结构
+BASE_DIR = Path(__file__).parent.parent.parent  # 获取项目根目录
+INPUT_FILE = BASE_DIR / "output" / "qa_dataset.jsonl"
+OUTPUT_DIR = BASE_DIR / "export"
 EXPORT_FORMATS = ["jsonl", "json"]
 DATASET_STYLES = ["Alpaca", "ShareGPT", "Custom"]
 
@@ -248,7 +249,7 @@ def export_data():
         # 生成完整的文件名
         file_extension = format_type
         full_filename = f"{filename}.{file_extension}"
-        output_path = os.path.join(OUTPUT_DIR, full_filename)
+        output_path = os.path.join(str(OUTPUT_DIR), full_filename)
         
         # 根据格式保存文件
         success = False
@@ -283,7 +284,7 @@ def download_file(filename):
             return jsonify({"error": "文件不存在"}), 404
         
         return send_file(
-            file_path,
+            str(file_path),  # 确保路径是字符串
             as_attachment=True,
             download_name=filename
         )

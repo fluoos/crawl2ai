@@ -10,12 +10,18 @@ from typing import Dict, List, Optional, Tuple
 from dotenv import load_dotenv
 from tqdm import tqdm
 
+# 获取项目根目录
+BASE_DIR = Path(__file__).parent.parent.parent
+
 # 配置日志
+log_file = BASE_DIR / "backend" / "logs" / "file_to_dataset.log"
+os.makedirs(log_file.parent, exist_ok=True)  # 确保日志目录存在
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler("file_to_dataset.log"),
+        logging.FileHandler(log_file),
         logging.StreamHandler()
     ]
 )
@@ -33,6 +39,10 @@ DEFAULT_CONFIG = {
 def load_config(config_path: str = "config.json") -> Dict:
     """加载配置文件"""
     config = DEFAULT_CONFIG.copy()
+    # 使用绝对路径
+    if not os.path.isabs(config_path):
+        config_path = BASE_DIR / "config" / config_path
+        
     if os.path.exists(config_path):
         try:
             with open(config_path, 'r', encoding='utf-8') as f:
@@ -47,8 +57,9 @@ def load_config(config_path: str = "config.json") -> Dict:
 
 def load_api_key() -> str:
     """从.env文件加载API key"""
-    # 加载.env文件
-    load_dotenv()
+    # 加载.env文件，使用绝对路径
+    env_path = BASE_DIR / ".env"
+    load_dotenv(dotenv_path=env_path)
     
     # 获取API key
     api_key = os.getenv("DEEPSEEK_API_KEY")
@@ -322,15 +333,15 @@ def main():
             base_url=config.get("base_url", "https://api.deepseek.com"),
         )
         
-        # 检查目录结构
-        upload_dir = Path(args.input)
+        # 检查目录结构 - 使用绝对路径
+        upload_dir = BASE_DIR / args.input if not os.path.isabs(args.input) else Path(args.input)
         if not upload_dir.exists():
             logger.error(f"上传目录不存在: {upload_dir.absolute()}")
             logger.info(f"创建上传目录: {upload_dir.absolute()}")
             upload_dir.mkdir(exist_ok=True)
         
-        # 确保输出目录存在
-        output_dir = Path(args.output)
+        # 确保输出目录存在 - 使用绝对路径
+        output_dir = BASE_DIR / args.output if not os.path.isabs(args.output) else Path(args.output)
         output_dir.mkdir(exist_ok=True)
         output_file = output_dir / "qa_dataset.jsonl"
         

@@ -14,19 +14,48 @@ This is a tool for generating datasets that can crawl links from specified domai
 ## Project Structure
 
 ```
-├── export_dataset.py # Backend implementation (Flask API)
-├── frontend/ # Frontend implementation (Vue3 + Ant Design)
-│ ├── index.html
-│ ├── package.json
-│ ├── vite.config.js
-│ └── src/
-│ ├── main.js
-│ ├── App.vue
-│ ├── api.js
-│ └── style.css
-├── output/ # Input file directory
-│ └── qa_dataset.jsonl # Original QA data
-└── export/ # Output file directory
+├── backend/               # Backend implementation
+│   ├── requirements.txt   # Python dependencies file
+│   ├── .env               # Configuration file
+│   ├── src/               # Source code directory
+│   │   ├── crawl_to_file.py      # Crawler to file conversion implementation
+│   │   ├── export_dataset.py     # Dataset export API implementation
+│   │   ├── file_to_dataset.py    # File to dataset conversion implementation
+│   │   ├── simple_crawler.py     # Simple crawler implementation
+│   │   └── clean_failed_files.py # Failed files cleanup tool
+│   └── tests/             # Test directory
+├── frontend/             # Frontend implementation (Vue3 + Ant Design)
+│   ├── index.html        # HTML entry file
+│   ├── package.json      # Frontend dependency configuration
+│   ├── vite.config.js    # Vite configuration file
+│   └── src/              # Frontend source code
+│       ├── main.js       # Main entry file
+│       ├── App.vue       # Main application component
+│       ├── components/   # Components directory
+│       │   ├── Crawler.vue      # Crawler configuration component
+│       │   ├── Converter.vue    # Converter configuration component
+│       │   └── Export.vue       # Export configuration component
+│       ├── api.js        # API call encapsulation
+│       └── style.css     # Global styles
+├── data/                 # Data directory
+│   ├── raw/              # Raw crawled data
+│   └── markdown/         # Converted markdown files
+├── output/               # Input file directory
+│   ├── qa_dataset.jsonl  # Original QA data
+│   └── crawled_urls.txt  # Crawled URL list
+├── export/               # Output file directory
+│   ├── alpaca/           # Alpaca format output
+│   ├── sharegpt/         # ShareGPT format output
+│   └── custom/           # Custom format output
+├── upload/               # Upload file directory
+├── config/               # Configuration file directory
+│   ├── crawler.yaml      # Crawler configuration
+│   └── export.yaml       # Export configuration
+├── .env.example          # Environment variables example file
+├── .gitignore            # Git ignore file configuration
+├── LICENSE               # License file
+├── README.md             # English documentation
+└── README.zh-CN.md       # Chinese documentation
 ```
 ## Quick Start
 
