@@ -1,0 +1,22 @@
+{
+  "name": "dataset-export-tool",
+  "version": "1.0.0",
+  "description": "数据集导出工具前端",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "vue": "^3.3.4",
+    "ant-design-vue": "^3.2.20",
+    "@ant-design/icons-vue": "^6.1.0",
+    "axios": "^1.6.2",
+    "@vueuse/core": "^10.5.0",
+    "vue-virtual-scroller": "^2.0.0-beta.8"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^4.2.3",
+    "vite": "^4.4.9"
+  }
+} 
