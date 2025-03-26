@@ -21,6 +21,7 @@ sdist/
 var/
 wheels/
 log/
+logs/
 node_modules/
 *.egg-info/
 .installed.cfg

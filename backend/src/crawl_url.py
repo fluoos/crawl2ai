@@ -74,8 +74,8 @@ async def main():
         ),
         stream=True, # 流式输出, 配置了stream=True后，爬虫会以流式输出结果，而不是一次性返回所有结果
         # cache_mode=CacheMode.ENABLED, # 使用缓存
-        max_session_permit=10, # 最大并发数,默认20
-        memory_threshold_percent=60.0 # 内存使用超过60%时，爬虫将暂停或减速，默认70%
+        # max_session_permit=10, # 最大并发数,默认20
+        # memory_threshold_percent=60.0 # 内存使用超过60%时，爬虫将暂停或减速，默认70%
     )
 
     # results = []
