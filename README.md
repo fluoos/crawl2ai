@@ -1,0 +1,2 @@
+# crawl2ai
+数据集生成的工具，一键爬取指定域名的链接，支持把链接转换成大模型友好的markdown文件，支持将markdown文件通过ChatGPT、deepseek、Gemma等大模型转换成训练大模型可用的数据集。
