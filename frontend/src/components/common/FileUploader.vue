@@ -11,7 +11,7 @@
         <InboxOutlined />
       </p>
       <p class="ant-upload-text">点击或拖拽文件到此区域上传</p>
-      <p class="ant-upload-hint">支持单个或批量上传，仅支持 .md 文件</p>
+      <p class="ant-upload-hint">支持单个或批量上传，仅支持 .md、.txt、.pdf、.docx、.doc 文件，上传后自动转换成大模型友好的.md文件</p>
     </a-upload-dragger>
     
     <div class="upload-actions" v-if="fileList.length > 0">
@@ -44,7 +44,7 @@ import { uploadFile } from '../../services/api';
 const props = defineProps({
   accept: {
     type: String,
-    default: '.md'
+    default: '.md,.txt,.pdf,.docx,.doc'
   }
 });
 

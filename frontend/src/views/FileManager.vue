@@ -1,8 +1,8 @@
 <template>
   <div class="file-manager">
-    <a-page-header title="文件管理" subtitle="管理和处理Markdown文件" />
+    <a-page-header title="文件管理" subtitle="管理和处理文件" />
     
-    <a-card title="上传Markdown文件" class="card-wrapper">
+    <a-card title="上传文件" class="card-wrapper">
       <FileUploader @upload-success="handleUploadSuccess" />
     </a-card>
     

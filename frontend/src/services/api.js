@@ -191,25 +191,3 @@ export const updateSystemConfig = (config) => {
   }
   return Promise.resolve(true);
 };
-
-/**
- * 重新获取指定链接
- */
-export async function refreshLink(linkId, forceRefresh = true) {
-  return request({
-    url: `/api/crawler/refresh/${linkId}`,
-    method: 'post',
-    data: { force_refresh: forceRefresh }
-  });
-}
-
-/**
- * 重新获取所有链接
- */
-export async function refreshAllLinks(forceRefresh = true) {
-  return request({
-    url: '/api/crawler/refresh-all',
-    method: 'post',
-    data: { force_refresh: forceRefresh }
-  });
-} 
