@@ -64,8 +64,7 @@ export const crawlLinks = (params) => {
     include_patterns: params.includePatterns,
     exclude_patterns: params.excludePatterns,
     crawl_strategy: params.crawlStrategy,
-    force_refresh: params.forceRefresh,
-    max_concurrent: params.maxConcurrent
+    force_refresh: params.forceRefresh
   };
   
   return request({
