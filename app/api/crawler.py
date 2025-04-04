@@ -136,7 +136,7 @@ async def convert_to_markdown(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"转换任务创建失败: {str(e)}")
 
-@router.post("/simple-crawl")
+@router.post("/single-crawl")
 async def simple_crawl(
     url: str,
     depth: int = 1,
@@ -216,8 +216,8 @@ async def crawl_urls(
         start_url: 起始URL
         max_depth: 最大爬取深度
         max_pages: 最大爬取页面数
-        include_patterns: 包含模式列表
-        exclude_patterns: 排除模式列表
+        include_patterns: 包含链接规则列表
+        exclude_patterns: 排除链接规则列表
         crawl_strategy: 爬取策略，"bfs"(广度优先)或"dfs"(深度优先)
         use_cache: 是否使用缓存
         max_concurrent: 最大并发请求数

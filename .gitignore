@@ -22,6 +22,11 @@ var/
 wheels/
 log/
 logs/
+venv/
+env/
+.env/
+.venv/
+ENV/
 node_modules/
 *.egg-info/
 .installed.cfg

@@ -77,18 +77,18 @@
         
         <a-row :gutter="24">
           <a-col :span="12">
-            <a-form-item label="包含模式（可选，用逗号分隔）" name="includePatterns">
+            <a-form-item label="包含URL模式（可选，用逗号分隔）" name="includePatterns">
               <a-input
                 v-model:value="formState.includePatterns"
-                placeholder="例如: blog,news"
+                placeholder="例如: blog,/news/"
               />
             </a-form-item>
           </a-col>
           <a-col :span="12">
-            <a-form-item label="排除模式（可选，用逗号分隔）" name="excludePatterns">
+            <a-form-item label="排除URL模式（可选，用逗号分隔）" name="excludePatterns">
               <a-input
                 v-model:value="formState.excludePatterns"
-                placeholder="例如: admin,login"
+                placeholder="例如: admin,/login/"
               />
             </a-form-item>
           </a-col>
@@ -108,14 +108,7 @@
       <template #extra>
         <a-space>
           <a-button @click="fetchCrawlStatus">
-            <ReloadOutlined /> 刷新
-          </a-button>
-          <a-button
-            type="primary"
-            @click="handleRefreshAll"
-            :loading="refreshLoading"
-          >
-            重新获取所有链接
+            <ReloadOutlined /> 刷新状态
           </a-button>
           <a-button
             type="primary"
@@ -146,9 +139,6 @@
               <a-button type="link" size="small" @click="handleSingleConvert(record)">
                 转换
               </a-button>
-              <a-button type="link" size="small" @click="handleRefreshSingle(record)" :loading="record.refreshing">
-                重新获取
-              </a-button>
             </a-space>
           </template>
         </template>
@@ -161,7 +151,7 @@
 import { ref, reactive, onMounted } from 'vue';
 import { message } from 'ant-design-vue';
 import { ReloadOutlined } from '@ant-design/icons-vue';
-import { crawlLinks, getCrawlStatus, convertToMarkdown, refreshLink, refreshAllLinks } from '../services/api';
+import { crawlLinks, getCrawlStatus, convertToMarkdown } from '../services/api';
 
 // 表单状态
 const formState = reactive({
@@ -181,7 +171,6 @@ const crawlStatus = ref('');
 const crawlStatusType = ref('info');
 const tableLoading = ref(false);
 const convertLoading = ref(false);
-const refreshLoading = ref(false);
 
 // 表格数据
 const urlList = ref([]);
@@ -341,50 +330,6 @@ const onSelectChange = (keys, rows) => {
 const handleTableChange = (pag) => {
   pagination.current = pag.current;
   pagination.pageSize = pag.pageSize;
-};
-
-// 重新获取单个链接
-const handleRefreshSingle = async (record) => {
-  try {
-    // 设置行刷新状态
-    const index = urlList.value.findIndex(item => item.id === record.id);
-    if (index !== -1) {
-      urlList.value[index].refreshing = true;
-    }
-    
-    await refreshLink(record.id, true);
-    message.success(`已开始重新获取: ${record.url}`);
-    
-    // 5秒后刷新状态
-    setTimeout(fetchCrawlStatus, 5000);
-  } catch (error) {
-    console.error('重新获取失败:', error);
-    message.error('重新获取失败: ' + (error.message || '未知错误'));
-  } finally {
-    // 重置刷新状态
-    const index = urlList.value.findIndex(item => item.id === record.id);
-    if (index !== -1) {
-      urlList.value[index].refreshing = false;
-    }
-  }
-};
-
-// 重新获取所有链接
-const handleRefreshAll = async () => {
-  try {
-    refreshLoading.value = true;
-    
-    await refreshAllLinks(true);
-    message.success('已开始重新获取所有链接');
-    
-    // 5秒后刷新状态
-    setTimeout(fetchCrawlStatus, 5000);
-  } catch (error) {
-    console.error('重新获取所有链接失败:', error);
-    message.error('重新获取所有链接失败: ' + (error.message || '未知错误'));
-  } finally {
-    refreshLoading.value = false;
-  }
 };
 
 // 转换单个URL

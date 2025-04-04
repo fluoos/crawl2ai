@@ -76,7 +76,7 @@ This is a tool for generating datasets that can crawl links from specified domai
 1. Start the backend server:
 
    ```bash
-   python export_dataset.py
+   uvicorn app.main:app --reload
    ```
 
 2. Start the frontend development server:
