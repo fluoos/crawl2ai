@@ -9,13 +9,14 @@ from urllib.parse import urlparse
 import logging
 import json
 from multiprocessing import Process
+from pathlib import Path
 
 from app.schemas.crawler import CrawlerRequest, CrawlerResponse, UrlToMarkdownRequest, UrlToMarkdownResponse
 from app.services.crawler_service import convert_urls_to_markdown
 from app.api.deps import get_api_key
 
 # 导入crawl4ai库
-from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, CacheMode
+from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, BrowserConfig, MemoryAdaptiveDispatcher, CrawlerMonitor, DisplayMode
 from crawl4ai.deep_crawling import BFSDeepCrawlStrategy, DFSDeepCrawlStrategy
 
 router = APIRouter()
@@ -225,16 +226,34 @@ def crawl_urls_process(url, max_depth, max_pages, include_patterns, exclude_patt
 
 async def convert_urls_to_markdown_task(urls, output_dir):
     """转换URL为Markdown的后台任务"""
-    try:
-        await convert_urls_to_markdown(urls, output_dir)
-    except Exception as e:
-        logging.error(f"转换任务失败: {str(e)}")
+    # try:
+    await convert_urls_to_markdown(urls, output_dir)
+    # except Exception as e:
+        # logging.error(f"转换任务失败: {str(e)}")
 
 def process_url(url):
     """处理URL，确保使用https协议"""
     if url.startswith('http://'):
         return url.replace('http://', 'https://', 1)
     return url
+
+def url_to_filename(url):
+    """将URL转换为文件名"""
+    parsed = urlparse(url)
+    path = parsed.path.replace('.html', '')
+    filename = path.strip('/').replace('/', '_')
+    if not filename:
+        filename = parsed.netloc
+    return f"{filename}.md"
+
+def get_existing_files(upload_dir):
+    """获取已存在的markdown文件列表"""
+    existing_files = set()
+    upload_path = Path(upload_dir)  # 将字符串转换为Path对象
+    if upload_path.exists():
+        for file in upload_path.glob("*.md"):  # 使用upload_path而不是upload_dir
+            existing_files.add(file.name)
+    return existing_files
 
 # 异步爬取URL
 async def crawl_urls_async(
@@ -366,64 +385,68 @@ async def crawl_urls_async(
 
 async def convert_urls_to_markdown(
     urls: List[str],
-    output_dir: str = "output"
+    upload_dir: str = "output"
 ) -> List[str]:
     """将URL列表转换为Markdown文件"""
-    os.makedirs(output_dir, exist_ok=True)
-    converted_files = []
+    os.makedirs(upload_dir, exist_ok=True)
     
-    async with aiohttp.ClientSession() as session:
-        for url in urls:
-            try:
+    # 获取已存在的文件列表
+    existing_files = get_existing_files(upload_dir)
+    print(f"发现 {len(existing_files)} 个已存在的markdown文件")
+    
+    print(f"读取到 {len(urls)} 个需要爬取的新URL")
+    
+    if not urls:
+        print("没有新的URL需要爬取")
+        return
+    
+    browser_config = BrowserConfig(verbose=True)
+    run_config = CrawlerRunConfig(
+        # markdown_generator=DefaultMarkdownGenerator(),
+        # Content filtering
+        # word_count_threshold=10,
+        # excluded_tags=['form', 'header'],
+        # exclude_external_links=True,
+
+        # Content processing
+        # process_iframes=True,
+        # remove_overlay_elements=True,
+        css_selector="#article-wrap, .article-title, .article-container",
+        # css_selector=".article-title, #article-container-warp",
+        excluded_selector=".article-pagination",
+        # target_elements=["#article-wrap"], // 无效
+        # Cache control
+        # cache_mode=CacheMode.ENABLED,  # Use cache if available
+        stream=True
+    )
+    dispatcher = MemoryAdaptiveDispatcher(
+        memory_threshold_percent=70.0,
+        check_interval=1.0,
+        max_session_permit=10,
+        monitor=CrawlerMonitor(
+            display_mode=DisplayMode.DETAILED
+        )
+    )
+
+    async with AsyncWebCrawler(config=browser_config) as crawler:
+        # 该逻辑不能修改，stream=True模式要使用async for result in await
+        async for result in await crawler.arun_many(
+            urls=list(urls),
+            config=run_config,
+            dispatcher=dispatcher
+        ):
+            if result.success and result.markdown and result.markdown.strip():
                 # 生成文件名
-                parsed_url = urlparse(url)
-                filename = f"{parsed_url.netloc}{parsed_url.path}".replace("/", "_")
-                if not filename.endswith(".md"):
-                    filename += ".md"
-                    
-                filepath = os.path.join(output_dir, filename)
+                filename = url_to_filename(result.url)
+                filepath = os.path.join(upload_dir, filename)
                 
-                # 获取页面内容
-                async with session.get(url, timeout=30) as response:
-                    if response.status != 200:  # 注意：应该是status而不是status_code
-                        continue
-                        
-                    html = await response.text()
-                    soup = BeautifulSoup(html, "html.parser")
-                    
-                    # 提取标题和内容
-                    title = soup.title.string if soup.title else "无标题"
-                    
-                    # 移除脚本和样式
-                    for script in soup(["script", "style"]):
-                        script.extract()
-                    
-                    # 获取正文内容
-                    main_content = soup.find("main") or soup.find("article") or soup.find("div", {"class": ["content", "main"]}) or soup.body
-                    
-                    # 创建Markdown文件
-                    with open(filepath, "w", encoding="utf-8") as f:
-                        f.write(f"# {title}\n\n")
-                        f.write(f"原始链接: {url}\n\n")
-                        
-                        # 提取段落
-                        for p in main_content.find_all(["p", "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "blockquote"]):
-                            if p.name.startswith('h'):
-                                level = int(p.name[1])
-                                f.write(f"{'#' * level} {p.get_text().strip()}\n\n")
-                            elif p.name == "ul" or p.name == "ol":
-                                for li in p.find_all("li"):
-                                    f.write(f"- {li.get_text().strip()}\n")
-                                f.write("\n")
-                            elif p.name == "blockquote":
-                                f.write(f"> {p.get_text().strip()}\n\n")
-                            else:
-                                f.write(f"{p.get_text().strip()}\n\n")
-                
-                converted_files.append(filepath)
-                logging.info(f"转换完成: {url} -> {filepath}")
-                
-            except Exception as e:
-                logging.error(f"转换 {url} 时出错: {str(e)}")
-    
-    return converted_files
+                # 保存markdown内容
+                with open(filepath, 'w', encoding='utf-8') as f:
+                    f.write(result.markdown)
+                print(f"已保存内容到: {filepath}")
+            elif result.status_code == 403 and "robots.txt" in result.error_message:
+                print(f"跳过 {result.url} - 被robots.txt阻止")
+            elif not result.markdown or not result.markdown.strip():
+                print(f"跳过 {result.url} - 内容为空")
+            else:
+                print(f"爬取失败 {result.url}: {result.error_message}")
