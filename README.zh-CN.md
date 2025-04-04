@@ -6,53 +6,80 @@
 
 - 支持一键爬取指定域名的链接
 - 支持把链接转换成大模型友好的markdown文件
+- 支持上传.md、.txt、.pdf、.docx、.doc等文件，自动转换成.md文件
 - 支持将markdown文件通过ChatGPT、deepseek、Gemma等大模型转换成训练大模型可用的数据集
 - 支持导出 JSONL 和 JSON 两种输出格式
 - 支持导出 Alpaca、ShareGPT 和自定义格式
 - 支持预览转换结果
+- 未来支持直接微调大模型
 
 ## 项目结构
 
 ```
-├── frontend/             # 前端实现（Vue3 + Ant Design）
-│   ├── index.html        # HTML入口文件
-│   ├── package.json      # 前端依赖配置
-│   ├── vite.config.js    # Vite配置文件
-│   └── src/              # 前端源代码
-│       ├── main.js       # 主入口文件
-│       ├── App.vue       # 主应用组件
-│       ├── components/   # 组件目录
-│       │   ├── Crawler.vue      # 爬虫配置组件
-│       │   ├── Converter.vue    # 转换配置组件
-│       │   └── Export.vue       # 导出配置组件
-│       ├── api.js        # API调用封装
-│       └── style.css     # 全局样式
-├── src/                  # 源代码目录
-│   ├── crawl_url.py      # URL爬取实现
-│   ├── crawl_to_file.py  # 爬虫到文件转换实现
-│   ├── export_dataset.py # 数据集导出API实现
-│   ├── file_to_dataset.py # 文件到数据集转换实现
-│   ├── simple_crawler.py # 简单爬虫实现
-│   └── clean_failed_files.py # 清理失败文件工具
-├── tests/                # 测试目录
-│   └── test.py           # 测试文件
-├── output/               # 输出目录
-│   ├── qa_dataset.jsonl  # 生成的QA数据集
-│   └── crawled_urls.txt  # 爬取的URL列表
-├── export/               # 导出目录
-│   ├── alpaca/           # Alpaca格式输出
-│   ├── sharegpt/         # ShareGPT格式输出
-│   └── custom/           # 自定义格式输出
-├── upload/               # 上传文件目录
-├── config/               # 配置文件目录
-│   ├── crawler.yaml      # 爬虫配置
-│   └── export.yaml       # 导出配置
-├── requirements.txt      # Python依赖文件
-├── .env                  # 环境变量
-├── .gitignore            # Git忽略文件配置
-├── LICENSE               # 许可证文件
-├── README.md             # 英文说明文档
-└── README.zh-CN.md       # 中文说明文档
+├── app/                    # 后端应用目录
+│   ├── api/                # API接口目录
+│   │   ├── common.py       # 通用API
+│   │   ├── converter.py    # 转换器API
+│   │   ├── crawler.py      # 爬虫API
+│   │   ├── deps.py         # 依赖项
+│   │   ├── export.py       # 导出API
+│   │   ├── files.py        # 文件操作API
+│   │   └── system.py       # 系统API
+│   ├── core/               # 核心功能
+│   │   └── config.py       # 配置文件
+│   ├── schemas/            # 数据模式
+│   │   ├── crawler.py      # 爬虫模式
+│   │   ├── converter.py    # 转换器模式
+│   │   └── export.py       # 导出模式
+│   ├── services/           # 服务层
+│   │   ├── crawler_service.py    # 爬虫服务
+│   │   ├── converter_service.py  # 转换服务
+│   │   └── export_service.py     # 导出服务
+│   ├── __init__.py         # 初始化文件
+│   └── main.py             # 主程序入口
+├── frontend/               # 前端目录
+│   ├── src/                # 源代码
+│   │   ├── api/            # API调用
+│   │   ├── assets/         # 静态资源
+│   │   ├── components/     # 组件目录
+│   │   │   ├── business/   # 业务组件
+│   │   │   ├── common/     # 通用组件
+│   │   │   ├── layout/     # 布局组件
+│   │   │   └── link/       # 链接组件
+│   │   ├── hooks/          # 自定义钩子
+│   │   ├── plugins/        # 插件
+│   │   ├── router/         # 路由
+│   │   ├── services/       # 服务
+│   │   ├── stores/         # 状态管理
+│   │   ├── utils/          # 工具函数
+│   │   ├── views/          # 视图
+│   │   ├── App.vue         # 主应用组件
+│   │   └── main.js         # 入口文件
+│   ├── index.html          # HTML入口
+│   ├── package.json        # 依赖配置
+│   ├── vite.config.js      # Vite配置
+│   └── vue.config.js       # Vue配置
+├── config/                 # 配置文件目录
+├── export/                 # 导出目录
+│   ├── alpaca/             # Alpaca格式导出
+│   ├── sharegpt/           # ShareGPT格式导出
+│   └── custom/             # 自定义格式导出
+├── logs/                   # 日志目录
+├── output/                 # 输出目录
+│   ├── crawled_urls.json   # 爬取的URL列表(JSON格式)
+│   ├── crawled_urls.txt    # 爬取的URL列表(TXT格式)
+│   ├── processed_files.json# 处理过的文件
+│   └── qa_dataset.jsonl    # 生成的QA数据集
+├── tests/                  # 测试目录
+├── upload/                 # 上传文件目录
+├── venv/                   # Python虚拟环境
+├── .env                    # 环境变量
+├── .gitignore              # Git忽略文件配置
+├── CONTRIBUTING.md         # 贡献指南
+├── LICENSE                 # 许可证文件
+├── README.md               # 英文说明文档
+├── README.zh-CN.md         # 中文说明文档
+└── requirements.txt        # Python依赖文件
 ```
 
 ## 快速开始
