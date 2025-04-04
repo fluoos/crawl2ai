@@ -8,8 +8,7 @@ class CrawlerRequest(BaseModel):
     include_patterns: Optional[List[str]] = None
     exclude_patterns: Optional[List[str]] = None
     crawl_strategy: Literal["bfs", "dfs"] = "bfs"
-    use_cache: bool = False
-    max_concurrent: int = Field(20, ge=1, le=50)
+    force_refresh: bool = False
     
 class UrlItem(BaseModel):
     id: int

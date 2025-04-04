@@ -5,7 +5,7 @@
     <a-card title="爬取网站链接" class="card-wrapper">
       <a-form layout="vertical">
         <a-row :gutter="24">
-          <a-col :span="12">
+          <a-col :span="6">
             <a-form-item label="网站域名" name="url">
               <a-input
                 v-model:value="formState.url"
@@ -21,19 +21,6 @@
               </a-select>
             </a-form-item>
           </a-col>
-          <a-col :span="6">
-            <a-form-item label="最大并发数" name="maxConcurrent">
-              <a-input-number
-                v-model:value="formState.maxConcurrent"
-                :min="1"
-                :max="50"
-                style="width: 100%"
-              />
-            </a-form-item>
-          </a-col>
-        </a-row>
-        
-        <a-row :gutter="24">
           <a-col :span="6">
             <a-form-item label="爬取深度" name="maxDepth">
               <a-input-number
@@ -52,6 +39,26 @@
                 :max="5000"
                 :step="10"
                 style="width: 100%"
+              />
+            </a-form-item>
+          </a-col>
+          
+        </a-row>
+        
+        <a-row :gutter="24">          
+          <a-col :span="6">
+            <a-form-item label="包含URL模式（可选，用逗号分隔）" name="includePatterns">
+              <a-input
+                v-model:value="formState.includePatterns"
+                placeholder="例如: blog,/news/"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :span="6">
+            <a-form-item label="排除URL模式（可选，用逗号分隔）" name="excludePatterns">
+              <a-input
+                v-model:value="formState.excludePatterns"
+                placeholder="例如: admin,/login/"
               />
             </a-form-item>
           </a-col>
@@ -74,34 +81,20 @@
             </a-form-item>
           </a-col>
         </a-row>
-        
-        <a-row :gutter="24">
-          <a-col :span="12">
-            <a-form-item label="包含URL模式（可选，用逗号分隔）" name="includePatterns">
-              <a-input
-                v-model:value="formState.includePatterns"
-                placeholder="例如: blog,/news/"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :span="12">
-            <a-form-item label="排除URL模式（可选，用逗号分隔）" name="excludePatterns">
-              <a-input
-                v-model:value="formState.excludePatterns"
-                placeholder="例如: admin,/login/"
-              />
-            </a-form-item>
-          </a-col>
-        </a-row>
       </a-form>
-      
-      <a-alert
-        v-if="crawlStatus"
-        :message="crawlStatus"
-        :type="crawlStatusType"
-        show-icon
-        style="margin-top: 16px"
-      />
+      <a-row :gutter="24"> 
+        <a-alert
+          v-if="crawlStatus"
+          :message="crawlStatus"
+          :type="crawlStatusType"
+          show-icon
+          style="flex: 1; margin-right: 10px;"
+        >
+        </a-alert>
+        <a-button v-if="crawlStatus.includes('进行中')" style="height: 40px;" danger type="primary" @click="handleStopCrawl">
+          强制停止
+        </a-button>
+      </a-row>
     </a-card>
     
     <a-card title="已爬取URL列表" class="card-wrapper">
@@ -151,7 +144,7 @@
 import { ref, reactive, onMounted } from 'vue';
 import { message } from 'ant-design-vue';
 import { ReloadOutlined } from '@ant-design/icons-vue';
-import { crawlLinks, getCrawlStatus, convertToMarkdown } from '../services/api';
+import { crawlLinks, getCrawlStatus, convertToMarkdown, stopCrawl } from '../services/api';
 
 // 表单状态
 const formState = reactive({
@@ -161,8 +154,7 @@ const formState = reactive({
   includePatterns: '',
   excludePatterns: '',
   crawlStrategy: 'bfs',
-  forceRefresh: false,
-  maxConcurrent: 20
+  forceRefresh: false
 });
 
 // 爬取状态
@@ -249,13 +241,12 @@ const startCrawl = async () => {
     
     const response = await crawlLinks({
       url: url,
-      max_depth: formState.maxDepth,
-      max_pages: formState.maxPages,
-      include_patterns: includePatterns,
-      exclude_patterns: excludePatterns,
-      crawl_strategy: formState.crawlStrategy,
-      force_refresh: formState.forceRefresh,
-      max_concurrent: formState.maxConcurrent
+      maxDepth: formState.maxDepth,
+      maxPages: formState.maxPages,
+      includePatterns: includePatterns,
+      excludePatterns: excludePatterns,
+      crawlStrategy: formState.crawlStrategy,
+      forceRefresh: formState.forceRefresh
     });
     
     if (response.status === 'success') {
@@ -280,6 +271,28 @@ const startCrawl = async () => {
   }
 };
 
+// 添加停止爬取的方法
+const handleStopCrawl = async () => {
+  try {
+    const response = await stopCrawl();
+    
+    if (response.status === 'success') {
+      message.success('已成功停止爬取任务');
+      crawlStatus.value = '爬取任务已手动停止';
+      crawlStatusType.value = 'warning';
+    } else {
+      message.error(response.message || '停止爬取任务失败');
+    }
+    
+    // 刷新状态
+    setTimeout(fetchCrawlStatus, 100);
+  } catch (error) {
+    console.error('停止爬取任务失败:', error);
+    message.error('停止爬取任务失败');
+  } finally {
+  }
+};
+
 // 获取爬虫状态
 const fetchCrawlStatus = async () => {
   tableLoading.value = true;
@@ -289,27 +302,23 @@ const fetchCrawlStatus = async () => {
     if (response.status === 'completed') {
       crawlStatus.value = '爬取完成';
       crawlStatusType.value = 'success';
-      
-      if (response.urls && response.urls.length > 0) {
-        // 更新URL列表
-        urlList.value = response.urls;
-        pagination.total = response.count || response.urls.length;
-      } else {
-        urlList.value = [];
-        pagination.total = 0;
-      }
     } else if (response.status === 'running') {
-      crawlStatus.value = '爬取任务正在进行中...';
+      crawlStatus.value = '爬取任务正在进行中...' + (response.urls && response.urls.length > 0 ? `已爬取${response.urls.length}个URL` : 0);
       crawlStatusType.value = 'info';
       
       // 继续轮询
-      setTimeout(fetchCrawlStatus, 5000);
+      setTimeout(fetchCrawlStatus, 8000);
     } else if (response.status === 'failed') {
       crawlStatus.value = response.message || '爬取任务失败';
       crawlStatusType.value = 'error';
     } else {
       crawlStatus.value = response.message || '获取爬虫状态';
       crawlStatusType.value = 'info';
+    }
+    if (response.urls && response.urls.length > 0) {
+      // 更新URL列表
+      urlList.value = response.urls;
+      pagination.total = response.count || response.urls.length;
     }
   } catch (error) {
     console.error('获取爬虫状态失败:', error);
