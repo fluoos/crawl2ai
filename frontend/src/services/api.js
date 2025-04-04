@@ -74,6 +74,13 @@ export const crawlLinks = (params) => {
   });
 };
 
+export const stopCrawl = () => {
+  return request({
+    url: '/api/crawler/stop-crawl',
+    method: 'post'
+  });
+};
+
 export const getCrawlStatus = () => {
   return request({
     url: '/api/crawler/status',

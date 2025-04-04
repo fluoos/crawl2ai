@@ -82,14 +82,19 @@
           </a-col>
         </a-row>
       </a-form>
-      
-      <a-alert
-        v-if="crawlStatus"
-        :message="crawlStatus"
-        :type="crawlStatusType"
-        show-icon
-        style="margin-top: 16px"
-      />
+      <a-row :gutter="24"> 
+        <a-alert
+          v-if="crawlStatus"
+          :message="crawlStatus"
+          :type="crawlStatusType"
+          show-icon
+          style="flex: 1; margin-right: 10px;"
+        >
+        </a-alert>
+        <a-button v-if="crawlStatus.includes('进行中')" style="height: 40px;" danger type="primary" @click="handleStopCrawl">
+          强制停止
+        </a-button>
+      </a-row>
     </a-card>
     
     <a-card title="已爬取URL列表" class="card-wrapper">
@@ -139,7 +144,7 @@
 import { ref, reactive, onMounted } from 'vue';
 import { message } from 'ant-design-vue';
 import { ReloadOutlined } from '@ant-design/icons-vue';
-import { crawlLinks, getCrawlStatus, convertToMarkdown } from '../services/api';
+import { crawlLinks, getCrawlStatus, convertToMarkdown, stopCrawl } from '../services/api';
 
 // 表单状态
 const formState = reactive({
@@ -263,6 +268,28 @@ const startCrawl = async () => {
     crawlStatusType.value = 'error';
   } finally {
     crawlLoading.value = false;
+  }
+};
+
+// 添加停止爬取的方法
+const handleStopCrawl = async () => {
+  try {
+    const response = await stopCrawl();
+    
+    if (response.status === 'success') {
+      message.success('已成功停止爬取任务');
+      crawlStatus.value = '爬取任务已手动停止';
+      crawlStatusType.value = 'warning';
+    } else {
+      message.error(response.message || '停止爬取任务失败');
+    }
+    
+    // 刷新状态
+    setTimeout(fetchCrawlStatus, 100);
+  } catch (error) {
+    console.error('停止爬取任务失败:', error);
+    message.error('停止爬取任务失败');
+  } finally {
   }
 };
 

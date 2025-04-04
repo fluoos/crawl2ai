@@ -58,10 +58,14 @@ async def crawl_links(
 async def stop_crawl(api_key: str = Depends(get_api_key)):
     """强制停止当前运行的爬虫任务"""
     try:
+        # 更新爬虫状态
+        with open(os.path.join("output", "crawler_status.json"), "w", encoding="utf-8") as f:
+            json.dump({"status": "stopped", "message": "爬虫任务已手动停止"}, f)
+
         process_info_file = os.path.join("output", "crawler_process.json")
-        
         # 检查是否有记录的爬虫进程
         if not os.path.exists(process_info_file):
+            
             return {
                 "status": "warning",
                 "message": "没有找到正在运行的爬虫任务信息",
@@ -109,9 +113,6 @@ async def stop_crawl(api_key: str = Depends(get_api_key)):
         except Exception as e:
             logging.error(f"终止进程时出错: {str(e)}")
         
-        # 更新爬虫状态
-        with open(os.path.join("output", "crawler_status.json"), "w", encoding="utf-8") as f:
-            json.dump({"status": "stopped", "message": "爬虫任务已手动停止"}, f)
         
         # 删除进程信息文件
         try:
@@ -157,16 +158,14 @@ async def crawl_status(api_key: str = Depends(get_api_key)):
                 status = "error"
                 message = f"读取状态文件失败: {str(e)}"
         
-        # 如果状态是"running"，也应该返回当前已爬取的URL
-        if status == "running":
-            # 读取当前已爬取的URL
-            if os.path.exists(urls_file):
-                try:
-                    with open(urls_file, 'r', encoding='utf-8') as f:
-                        crawled_data = json.load(f)
-                        count = len(crawled_data)
-                except Exception as e:
-                    logging.error(f"读取URL文件失败: {str(e)}")
+        # 读取当前已爬取的URL
+        if os.path.exists(urls_file):
+            try:
+                with open(urls_file, 'r', encoding='utf-8') as f:
+                    crawled_data = json.load(f)
+                    count = len(crawled_data)
+            except Exception as e:
+                logging.error(f"读取URL文件失败: {str(e)}")
         
         # 返回组合的结果
         return {
@@ -199,24 +198,6 @@ async def convert_to_markdown(
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"转换任务创建失败: {str(e)}")
-
-@router.post("/single-crawl")
-async def simple_crawl(
-    url: str,
-    depth: int = 1,
-    api_key: str = Depends(get_api_key)
-):
-    """简单爬虫，只爬取指定URL和直接链接"""
-    try:
-        # 使用同步版本
-        urls = crawl_urls_sync(url, max_depth=depth, max_pages=50)
-        return {
-            "status": "success",
-            "message": f"成功爬取 {len(urls)} 个URL",
-            "urls": urls
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"爬虫失败: {str(e)}")
 
 # 进程中运行爬虫任务
 def crawl_urls_process(url, max_depth, max_pages, include_patterns, exclude_patterns, crawl_strategy="bfs", force_refresh=False):
@@ -446,31 +427,3 @@ async def convert_urls_to_markdown(
                 logging.error(f"转换 {url} 时出错: {str(e)}")
     
     return converted_files
-
-# 创建一个同步版本的爬虫函数，内部使用事件循环
-def crawl_urls_sync(
-    start_url: str,
-    max_depth: int = 3,
-    max_pages: int = 100,
-    include_patterns: Optional[List[str]] = None,
-    exclude_patterns: Optional[List[str]] = None,
-    crawl_strategy: str = "bfs"
-) -> List[str]:
-    """同步接口，使用asyncio.run()执行异步函数"""
-    try:
-        # 使用asyncio.run执行异步函数
-        result = asyncio.run(
-            crawl_urls_async(
-                start_url=start_url,
-                max_depth=max_depth,
-                max_pages=max_pages,
-                include_patterns=include_patterns,
-                exclude_patterns=exclude_patterns,
-                crawl_strategy=crawl_strategy
-            )
-        )
-        return result
-    except Exception as e:
-        print(f"爬虫任务执行失败: {str(e)}")
-        logging.error(f"爬虫任务执行失败: {str(e)}")
-        return [] 
