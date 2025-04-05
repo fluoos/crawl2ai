@@ -9,7 +9,6 @@ from app.core.config import settings
 from pydantic import BaseModel
 
 from app.schemas.converter import ConversionRequest, ConversionResponse
-from app.services.converter_service import convert_files_to_dataset
 from app.api.deps import get_api_key
 
 router = APIRouter()
@@ -101,6 +100,7 @@ async def get_conversion_status(output_file: str = Query("qa_dataset.jsonl")):
 # 后台任务
 async def convert_files_to_dataset_task(files, model, output_file):
     """转换文件到数据集的后台任务"""
+    print(f"正在转换 {len(files)} 个文件")
     try:
         await convert_files_to_dataset(files, model, output_file)
         conversion_state[output_file]["status"] = "completed"
@@ -123,6 +123,7 @@ async def convert_files_to_dataset(
     
     output_path = os.path.join("output", output_file)
     results = []
+    print(f"开始转换 {len(files)} 个文件")
     
     # 根据模型选择不同的API和提示词
     if model == "deepseek":
@@ -226,6 +227,7 @@ async def convert_files_to_dataset(
                             logging.warning(f"API返回的JSON缺少'qa_pairs'字段或格式不符合预期")
                     except json.JSONDecodeError as e:
                         logging.error(f"JSON解析错误: {str(e)}, 内容: {generated_text}")
+                        
                         # 尝试基本的问答提取
                         questions = []
                         answers = []
@@ -263,10 +265,13 @@ async def convert_files_to_dataset(
             except Exception as e:
                 logging.error(f"处理文件 {file_path} 时出错: {str(e)}")
     
-    # 保存结果到jsonl文件
+    # 关键修改：使用追加模式写入文件
     os.makedirs("output", exist_ok=True)
-    with open(output_path, "w", encoding="utf-8") as f:
+    
+    # 使用追加模式打开文件
+    with open(output_path, "a", encoding="utf-8") as f:
         for item in results:
             f.write(json.dumps(item, ensure_ascii=False) + "\n")
     
+    print(f"提取了 {len(results)} 个问答对")
     return output_path 

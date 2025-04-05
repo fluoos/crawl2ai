@@ -12,7 +12,6 @@ from multiprocessing import Process
 from pathlib import Path
 
 from app.schemas.crawler import CrawlerRequest, CrawlerResponse, UrlToMarkdownRequest, UrlToMarkdownResponse
-from app.services.crawler_service import convert_urls_to_markdown
 from app.api.deps import get_api_key
 
 # 导入crawl4ai库
@@ -178,24 +177,66 @@ async def crawl_status(api_key: str = Depends(get_api_key)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取爬虫状态失败: {str(e)}")
 
+# 添加这个函数用于在进程中运行转换任务
+def convert_urls_to_markdown_process(urls, output_dir="output"):
+    """在独立进程中运行URL到Markdown的转换任务"""
+    # 记录转换任务开始
+    os.makedirs("output", exist_ok=True)
+    with open(os.path.join("output", "convert_status.json"), "w", encoding="utf-8") as f:
+        json.dump({"status": "running", "message": f"转换任务正在进行中，共{len(urls)}个URL..."}, f)
+    
+    try:
+        # 在新进程中运行异步函数，使用asyncio.run是安全的
+        asyncio.run(convert_urls_to_markdown(
+            urls=urls,
+            output_dir=output_dir
+        ))
+        
+        # 更新状态为已完成
+        with open(os.path.join("output", "convert_status.json"), "w", encoding="utf-8") as f:
+            json.dump({"status": "completed", "message": "转换任务已完成"}, f)
+    except Exception as e:
+        # 记录错误
+        with open(os.path.join("output", "convert_status.json"), "w", encoding="utf-8") as f:
+            json.dump({"status": "failed", "message": f"转换任务失败: {str(e)}"}, f)
+        print(f"转换任务失败: {str(e)}")
+
+# 修改API接口
 @router.post("/convert", response_model=UrlToMarkdownResponse)
 async def convert_to_markdown(
     request: UrlToMarkdownRequest,
-    background_tasks: BackgroundTasks,
     api_key: str = Depends(get_api_key)
 ):
     """将URL列表转换为Markdown文件"""
+    urls = [str(url) for url in request.urls]
+    if not urls:
+        print("没有需要转换的URL")
+        return {
+            "status": "success",
+            "message": "没有需要转换的URL"
+        }
+    
     try:
-        # 使用后台任务进行转换
-        background_tasks.add_task(
-            convert_urls_to_markdown_task,
-            [str(url) for url in request.urls],
-            output_dir=request.output_dir
+        # 使用进程来执行转换任务
+        process = Process(
+            target=convert_urls_to_markdown_process,
+            args=(
+                urls,
+                request.output_dir
+            )
         )
+        process.daemon = True
+        process.start()
+        
+        # 将进程ID保存到文件
+        with open(os.path.join("output", "convert_process.json"), "w") as f:
+            json.dump({"pid": process.pid, "start_time": time.time()}, f)
+        
+        print(f"转换任务已开始，进程ID: {process.pid}")
         
         return {
             "status": "success",
-            "message": "转换任务已开始，请稍后查看结果"
+            "message": f"转换任务已开始，共{len(urls)}个URL，请稍后查看结果"
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"转换任务创建失败: {str(e)}")
@@ -224,12 +265,6 @@ def crawl_urls_process(url, max_depth, max_pages, include_patterns, exclude_patt
             json.dump({"status": "failed", "message": f"爬虫任务失败: {str(e)}"}, f)
         print(f"爬虫任务失败: {str(e)}")
 
-async def convert_urls_to_markdown_task(urls, output_dir):
-    """转换URL为Markdown的后台任务"""
-    # try:
-    await convert_urls_to_markdown(urls, output_dir)
-    # except Exception as e:
-        # logging.error(f"转换任务失败: {str(e)}")
 
 def process_url(url):
     """处理URL，确保使用https协议"""
@@ -246,12 +281,12 @@ def url_to_filename(url):
         filename = parsed.netloc
     return f"{filename}.md"
 
-def get_existing_files(upload_dir):
+def get_existing_files(output_dir):
     """获取已存在的markdown文件列表"""
     existing_files = set()
-    upload_path = Path(upload_dir)  # 将字符串转换为Path对象
+    upload_path = Path(output_dir)  # 将字符串转换为Path对象
     if upload_path.exists():
-        for file in upload_path.glob("*.md"):  # 使用upload_path而不是upload_dir
+        for file in upload_path.glob("*.md"):  # 使用upload_path而不是output_dir
             existing_files.add(file.name)
     return existing_files
 
@@ -385,20 +420,16 @@ async def crawl_urls_async(
 
 async def convert_urls_to_markdown(
     urls: List[str],
-    upload_dir: str = "output"
+    output_dir: str = "output/markdown"
 ) -> List[str]:
     """将URL列表转换为Markdown文件"""
-    os.makedirs(upload_dir, exist_ok=True)
+    os.makedirs(output_dir, exist_ok=True)
+
+    print(f"读取到 {len(urls)} 个需要转换的新URL")
     
     # 获取已存在的文件列表
-    existing_files = get_existing_files(upload_dir)
-    print(f"发现 {len(existing_files)} 个已存在的markdown文件")
-    
-    print(f"读取到 {len(urls)} 个需要爬取的新URL")
-    
-    if not urls:
-        print("没有新的URL需要爬取")
-        return
+    # existing_files = get_existing_files(output_dir)
+    # print(f"发现 {len(existing_files)} 个已存在的markdown文件")
     
     browser_config = BrowserConfig(verbose=True)
     run_config = CrawlerRunConfig(
@@ -411,7 +442,7 @@ async def convert_urls_to_markdown(
         # Content processing
         # process_iframes=True,
         # remove_overlay_elements=True,
-        css_selector="#article-wrap, .article-title, .article-container",
+        # css_selector="#article-wrap, .article-title, .article-container",
         # css_selector=".article-title, #article-container-warp",
         excluded_selector=".article-pagination",
         # target_elements=["#article-wrap"], // 无效
@@ -438,7 +469,7 @@ async def convert_urls_to_markdown(
             if result.success and result.markdown and result.markdown.strip():
                 # 生成文件名
                 filename = url_to_filename(result.url)
-                filepath = os.path.join(upload_dir, filename)
+                filepath = os.path.join(output_dir, filename)
                 
                 # 保存markdown内容
                 with open(filepath, 'w', encoding='utf-8') as f:
@@ -450,3 +481,5 @@ async def convert_urls_to_markdown(
                 print(f"跳过 {result.url} - 内容为空")
             else:
                 print(f"爬取失败 {result.url}: {result.error_message}")
+
+    return urls
