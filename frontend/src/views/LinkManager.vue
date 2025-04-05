@@ -362,7 +362,7 @@ const handleConvertUrls = async (urls) => {
   try {
     const response = await convertToMarkdown({
       urls: urls,
-      output_dir: "output"
+      output_dir: "output/markdown"
     });
     
     if (response.status === 'success') {

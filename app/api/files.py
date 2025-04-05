@@ -14,27 +14,12 @@ async def get_file_list(
 ):
     """获取文件列表"""
     try:
-        upload_dir = "upload"
-        output_dir = "output"
+        output_dir = "output/markdown"
         
         # 确保目录存在
-        os.makedirs(upload_dir, exist_ok=True)
         os.makedirs(output_dir, exist_ok=True)
         
         all_files = []
-        
-        # 获取上传目录中的Markdown文件
-        for filename in os.listdir(upload_dir):
-            if filename.endswith(".md"):
-                file_path = os.path.join(upload_dir, filename)
-                stats = os.stat(file_path)
-                all_files.append({
-                    "filename": filename,
-                    "path": file_path,
-                    "size": stats.st_size,
-                    "modifiedTime": datetime.datetime.fromtimestamp(stats.st_mtime).strftime("%Y-%m-%d %H:%M:%S"),
-                    "directory": "upload"
-                })
         
         # 获取输出目录中的Markdown文件
         for filename in os.listdir(output_dir):
@@ -96,6 +81,8 @@ async def upload_files(files: List[UploadFile] = File(...)):
                 "path": file_path,
                 "size": os.stat(file_path).st_size
             })
+        # TODO 将上传的文件转换为markdown文件
+        # 使用进程来执行转换任务
         
         return {
             "status": "success",
