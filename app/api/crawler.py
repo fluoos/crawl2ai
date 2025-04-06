@@ -450,22 +450,23 @@ async def convert_urls_to_markdown(
         # cache_mode=CacheMode.ENABLED,  # Use cache if available
         stream=True
     )
-    dispatcher = MemoryAdaptiveDispatcher(
-        memory_threshold_percent=70.0,
-        check_interval=1.0,
-        max_session_permit=10,
-        monitor=CrawlerMonitor(
-            display_mode=DisplayMode.DETAILED
-        )
-    )
+    # dispatcher = MemoryAdaptiveDispatcher(
+    #     memory_threshold_percent=70.0,
+    #     check_interval=1.0,
+    #     max_session_permit=10,
+    #     monitor=CrawlerMonitor(
+    #         display_mode=DisplayMode.DETAILED
+    #     )
+    # )
 
     async with AsyncWebCrawler(config=browser_config) as crawler:
         # 该逻辑不能修改，stream=True模式要使用async for result in await
         async for result in await crawler.arun_many(
             urls=list(urls),
             config=run_config,
-            dispatcher=dispatcher
+            # dispatcher=dispatcher
         ):
+            print(f"已转换链接: {result.url}")
             if result.success and result.markdown and result.markdown.strip():
                 # 生成文件名
                 filename = url_to_filename(result.url)
@@ -475,6 +476,31 @@ async def convert_urls_to_markdown(
                 with open(filepath, 'w', encoding='utf-8') as f:
                     f.write(result.markdown)
                 print(f"已保存内容到: {filepath}")
+                
+                # 更新crawled_urls.json，添加filePath字段
+                crawled_urls_path = os.path.join("output", "crawled_urls.json")
+                updated = False
+                
+                # 读取现有的JSON文件
+                if os.path.exists(crawled_urls_path):
+                    try:
+                        with open(crawled_urls_path, 'r', encoding='utf-8') as f:
+                            crawled_data = json.load(f)
+                            
+                        # 遍历数组，查找匹配的URL并添加filePath
+                        for item in crawled_data:
+                            if isinstance(item, dict) and item.get('url') == result.url:
+                                item['filePath'] = filepath.replace('\\', '/')  # 确保路径格式一致
+                                updated = True
+                                break
+                        
+                        # 保存更新后的文件
+                        if updated:
+                            with open(crawled_urls_path, 'w', encoding='utf-8') as f:
+                                json.dump(crawled_data, f, ensure_ascii=False, indent=2)
+                    except Exception as e:
+                        print(f"更新crawled_urls.json时出错: {str(e)}")
+                    
             elif result.status_code == 403 and "robots.txt" in result.error_message:
                 print(f"跳过 {result.url} - 被robots.txt阻止")
             elif not result.markdown or not result.markdown.strip():
