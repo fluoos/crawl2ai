@@ -2,9 +2,7 @@ import time
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from typing import List, Optional
 import os
-import aiohttp
 import asyncio
-from bs4 import BeautifulSoup
 from urllib.parse import urlparse
 import logging
 import json
@@ -201,6 +199,83 @@ def convert_urls_to_markdown_process(urls, output_dir="output"):
         with open(os.path.join("output", "convert_status.json"), "w", encoding="utf-8") as f:
             json.dump({"status": "failed", "message": f"转换任务失败: {str(e)}"}, f)
         print(f"转换任务失败: {str(e)}")
+
+# 删除链接API接口
+@router.post("/delete-url", response_model=CrawlerResponse)
+async def delete_url(
+    request: UrlToMarkdownRequest,
+    api_key: str = Depends(get_api_key)
+):
+    """删除指定的URL链接"""
+    urls = [str(url) for url in request.urls]
+    if not urls:
+        return {
+            "status": "warning",
+            "message": "没有指定要删除的URL",
+            "urls": [],
+            "count": 0
+        }
+    
+    try:
+        # 确保输出目录存在
+        os.makedirs("output", exist_ok=True)
+        # JSON文件路径
+        crawled_urls_path = os.path.join("output", "crawled_urls.json")
+        deleted_count = 0
+        
+        # 检查文件是否存在
+        if os.path.exists(crawled_urls_path):
+            try:
+                # 读取现有数据
+                with open(crawled_urls_path, 'r', encoding='utf-8') as f:
+                    crawled_data = json.load(f)
+                
+                # 记录原始数量
+                original_count = len(crawled_data)
+                
+                # 过滤掉要删除的URL
+                new_data = [item for item in crawled_data 
+                           if not (isinstance(item, dict) and item.get('url') in urls)]
+                
+                # 计算删除的数量
+                deleted_count = original_count - len(new_data)
+                
+                # 保存更新后的文件
+                with open(crawled_urls_path, 'w', encoding='utf-8') as f:
+                    json.dump(new_data, f, ensure_ascii=False, indent=2)
+                
+                print(f"已从crawled_urls.json中删除 {deleted_count} 个URL")
+                    
+            except json.JSONDecodeError:
+                return {
+                    "status": "error",
+                    "message": "crawled_urls.json文件格式错误",
+                    "urls": [],
+                    "count": 0
+                }
+            except Exception as e:
+                return {
+                    "status": "error",
+                    "message": f"处理crawled_urls.json时出错: {str(e)}",
+                    "urls": [],
+                    "count": 0
+                }
+        else:
+            return {
+                "status": "warning",
+                "message": "crawled_urls.json文件不存在",
+                "urls": [],
+                "count": 0
+            }
+        
+        return {
+            "status": "success",
+            "message": f"成功删除 {deleted_count} 个URL",
+            "urls": [],
+            "count": deleted_count
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"删除URL失败: {str(e)}")
 
 # 修改API接口
 @router.post("/convert", response_model=UrlToMarkdownResponse)

@@ -81,6 +81,14 @@ export const stopCrawl = () => {
   });
 };
 
+export const deleteUrl = (params) => {
+  return request({
+    url: '/api/crawler/delete-url',
+    method: 'post',
+    data: params
+  });
+};
+
 export const getCrawlStatus = () => {
   return request({
     url: '/api/crawler/status',
