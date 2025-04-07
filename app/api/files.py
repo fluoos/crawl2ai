@@ -4,6 +4,7 @@ from typing import List, Optional
 import os
 import datetime
 import shutil
+import json
 
 router = APIRouter()
 
@@ -14,26 +15,53 @@ async def get_file_list(
 ):
     """获取文件列表"""
     try:
-        output_dir = "output/markdown"
-        
-        # 确保目录存在
-        os.makedirs(output_dir, exist_ok=True)
-        
+        # 读取markdown_manager.json文件
+        manager_path = os.path.join("output", "markdown_manager.json")
         all_files = []
         
-        # 获取输出目录中的Markdown文件
-        for filename in os.listdir(output_dir):
-            if filename.endswith(".md"):
-                file_path = os.path.join(output_dir, filename)
-                stats = os.stat(file_path)
-                all_files.append({
-                    "filename": filename,
-                    "path": file_path,
-                    "size": stats.st_size,
-                    "modifiedTime": datetime.datetime.fromtimestamp(stats.st_mtime).strftime("%Y-%m-%d %H:%M:%S"),
-                    "directory": "output"
-                })
-        
+        if os.path.exists(manager_path):
+            try:
+                with open(manager_path, 'r', encoding='utf-8') as f:
+                    manager_data = json.load(f)
+                
+                # 处理每一个记录，添加文件信息
+                for item in manager_data:
+                    if isinstance(item, dict) and 'filePath' in item:
+                        file_path = item['filePath']
+                        
+                        # 确保文件路径使用系统分隔符
+                        file_path = file_path.replace('/', os.sep)
+                        
+                        # 如果是相对路径，转换为绝对路径
+                        if not os.path.isabs(file_path):
+                            file_path = os.path.join(".", file_path)
+                            
+                        # 获取文件信息
+                        if os.path.exists(file_path):
+                            filename = os.path.basename(file_path)
+                            stats = os.stat(file_path)
+                            
+                            # 创建文件记录
+                            file_info = {
+                                "filename": filename,
+                                "path": file_path,
+                                "size": stats.st_size,
+                                "modifiedTime": datetime.datetime.fromtimestamp(stats.st_mtime).strftime("%Y-%m-%d %H:%M:%S"),
+                                "url": item.get('url', ''),
+                                "title": item.get('title', filename),
+                                "isDataset": item.get('isDataset', False)
+                            }
+                            
+                            # 添加manager_data中的其他字段
+                            for key, value in item.items():
+                                if key not in file_info:
+                                    file_info[key] = value
+                                    
+                            all_files.append(file_info)
+            except Exception as e:
+                print(f"读取markdown_manager.json出错: {str(e)}")
+                # 出错时使用空列表继续
+                
         # 按修改时间降序排序
         all_files.sort(key=lambda x: x["modifiedTime"], reverse=True)
         

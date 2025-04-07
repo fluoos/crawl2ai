@@ -63,9 +63,9 @@
             </a-form-item>
           </a-col>
           <a-col :span="6">
-            <a-form-item label="重新获取内容" name="forceRefresh">
+            <a-form-item label="清空并重新获取" name="forceRefresh">
               <a-switch v-model:checked="formState.forceRefresh" />
-              <div class="form-item-hint">启用后将忽略缓存重新爬取</div>
+              <div class="form-item-hint">启用后将清除所有链接并重新爬取</div>
             </a-form-item>
           </a-col>
           <a-col :span="6">

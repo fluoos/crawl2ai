@@ -10,6 +10,7 @@ import logging
 import json
 from multiprocessing import Process
 from pathlib import Path
+from datetime import datetime
 
 from app.schemas.crawler import CrawlerRequest, CrawlerResponse, UrlToMarkdownRequest, UrlToMarkdownResponse
 from app.api.deps import get_api_key
@@ -476,30 +477,12 @@ async def convert_urls_to_markdown(
                 with open(filepath, 'w', encoding='utf-8') as f:
                     f.write(result.markdown)
                 print(f"已保存内容到: {filepath}")
+
+                # 更新markdown_manager.json，添加filePath字段
+                update_markdown_registry(result.url, filepath)
                 
                 # 更新crawled_urls.json，添加filePath字段
-                crawled_urls_path = os.path.join("output", "crawled_urls.json")
-                updated = False
-                
-                # 读取现有的JSON文件
-                if os.path.exists(crawled_urls_path):
-                    try:
-                        with open(crawled_urls_path, 'r', encoding='utf-8') as f:
-                            crawled_data = json.load(f)
-                            
-                        # 遍历数组，查找匹配的URL并添加filePath
-                        for item in crawled_data:
-                            if isinstance(item, dict) and item.get('url') == result.url:
-                                item['filePath'] = filepath.replace('\\', '/')  # 确保路径格式一致
-                                updated = True
-                                break
-                        
-                        # 保存更新后的文件
-                        if updated:
-                            with open(crawled_urls_path, 'w', encoding='utf-8') as f:
-                                json.dump(crawled_data, f, ensure_ascii=False, indent=2)
-                    except Exception as e:
-                        print(f"更新crawled_urls.json时出错: {str(e)}")
+                update_crawled_url_filepath(result.url, filepath)
                     
             elif result.status_code == 403 and "robots.txt" in result.error_message:
                 print(f"跳过 {result.url} - 被robots.txt阻止")
@@ -509,3 +492,110 @@ async def convert_urls_to_markdown(
                 print(f"爬取失败 {result.url}: {result.error_message}")
 
     return urls
+
+def update_crawled_url_filepath(url, filepath):
+    """
+    更新crawled_urls.json文件，为特定URL添加文件路径
+    
+    参数:
+    - url: 爬取的原始URL
+    - filepath: 保存的Markdown文件路径
+    
+    返回:
+    - bool: 是否成功更新
+    """
+    crawled_urls_path = os.path.join("output", "crawled_urls.json")
+    updated = False
+    
+    # 读取现有的JSON文件
+    if os.path.exists(crawled_urls_path):
+        try:
+            with open(crawled_urls_path, 'r', encoding='utf-8') as f:
+                crawled_data = json.load(f)
+                
+            # 遍历数组，查找匹配的URL并添加filePath
+            for item in crawled_data:
+                if isinstance(item, dict) and item.get('url') == url:
+                    item['filePath'] = filepath.replace('\\', '/')  # 确保路径格式一致
+                    updated = True
+                    break
+            
+            # 保存更新后的文件
+            if updated:
+                with open(crawled_urls_path, 'w', encoding='utf-8') as f:
+                    json.dump(crawled_data, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"更新crawled_urls.json时出错: {str(e)}")
+            return False
+    
+    return updated
+
+def update_markdown_registry(url, filepath, title=None):
+    """
+    更新Markdown文件注册表，添加或更新URL对应的文件路径
+    
+    参数:
+    - url: 爬取的原始URL
+    - filepath: 保存的Markdown文件路径
+    - title: 文档标题（可选）
+    
+    返回:
+    - bool: 是否成功更新
+    """
+    registry_path = os.path.join("output", "markdown_manager.json")
+    relative_path = filepath.replace('\\', '/')  # 确保路径格式一致
+    
+    # 创建基本文件记录
+    file_record = {
+        "url": url,
+        "filePath": relative_path,
+        "timestamp": datetime.now().isoformat(),
+        "isDataset": False
+    }
+    
+    # 如果提供了标题，添加到记录中
+    if title:
+        file_record["title"] = title
+    
+    # 确保输出目录存在
+    os.makedirs("output", exist_ok=True)
+    
+    try:
+        # 检查文件是否存在
+        if os.path.exists(registry_path):
+            # 读取现有数据
+            with open(registry_path, 'r', encoding='utf-8') as f:
+                try:
+                    registry_data = json.load(f)
+                    if not isinstance(registry_data, list):
+                        registry_data = []
+                except json.JSONDecodeError:
+                    # 文件内容不是有效的JSON
+                    registry_data = []
+        else:
+            # 文件不存在，创建新的数组
+            registry_data = []
+        
+        # 检查URL是否已存在
+        url_exists = False
+        for item in registry_data:
+            if isinstance(item, dict) and item.get('url') == url:
+                # 更新现有记录
+                item.update(file_record)
+                url_exists = True
+                break
+        
+        # 如果URL不存在，添加新记录
+        if not url_exists:
+            registry_data.append(file_record)
+        
+        # 保存更新后的注册表
+        with open(registry_path, 'w', encoding='utf-8') as f:
+            json.dump(registry_data, f, ensure_ascii=False, indent=2)
+        
+        return True
+    
+    except Exception as e:
+        print(f"更新Markdown注册表时出错: {str(e)}")
+        logging.error(f"更新Markdown注册表时出错: {str(e)}")
+        return False
