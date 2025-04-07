@@ -80,6 +80,58 @@ async def get_file_list(
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+@router.get("/preview")
+async def preview_file(path: str = Query(...)):
+    """预览Markdown文件内容"""
+    try:
+        # 安全检查：确保path是有效的，防止目录遍历攻击
+        if ".." in path or "~" in path:
+            raise HTTPException(status_code=400, detail="无效的文件路径")
+        
+        # 标准化路径，确保使用正确的分隔符
+        file_path = path.replace('/', os.sep).replace('\\', os.sep)
+        
+        # 如果是相对路径且不以"."开头，添加"./"
+        if not os.path.isabs(file_path) and not file_path.startswith("."):
+            file_path = os.path.join(".", file_path)
+        
+        # 检查文件是否存在
+        if not os.path.exists(file_path):
+            raise HTTPException(status_code=404, detail=f"文件 '{path}' 不存在")
+        
+        # 检查是否为文件而非目录
+        if not os.path.isfile(file_path):
+            raise HTTPException(status_code=400, detail=f"'{path}' 不是一个文件")
+        
+        # 检查文件大小，避免加载过大的文件
+        file_size = os.path.getsize(file_path)
+        if file_size > 10 * 1024 * 1024:  # 10MB限制
+            raise HTTPException(status_code=400, detail="文件过大，无法预览")
+        
+        # 读取文件内容
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                content = f.read()
+                
+            # 获取文件基本信息
+            filename = os.path.basename(file_path)
+            stats = os.stat(file_path)
+            
+            return {
+                "status": "success",
+                "content": content,
+                "filename": filename,
+                "size": stats.st_size,
+                "modifiedTime": datetime.datetime.fromtimestamp(stats.st_mtime).strftime("%Y-%m-%d %H:%M:%S")
+            }
+        except UnicodeDecodeError:
+            raise HTTPException(status_code=400, detail="文件编码错误，无法预览")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"预览文件失败: {str(e)}")
 
 @router.post("/upload")
 async def upload_files(files: List[UploadFile] = File(...)):

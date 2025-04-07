@@ -160,14 +160,21 @@ export const getExportFiles = () => {
   });
 };
 
-// ------------ 新架构中的API别名 ------------
-
 // 文件管理API
 export const getFileList = (page = 1, pageSize = 10) => {
   return request({
     url: '/api/files',
     method: 'get',
     params: { page, pageSize }
+  });
+};
+
+// 文件管理API-预览 
+export const getFilePreview = (path) => {
+  return request({
+    url: '/api/files/preview',
+    method: 'get',
+    params: { path }
   });
 };
 

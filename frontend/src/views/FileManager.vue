@@ -62,7 +62,7 @@
         </a-form-item>
         
         <a-form-item label="输出文件名">
-          <a-input v-model:value="convertForm.outputFile" placeholder="qa_dataset.jsonl" />
+          <a-input disabled v-model:value="convertForm.outputFile" placeholder="qa_dataset.jsonl" />
         </a-form-item>
       </a-form>
     </a-modal>
@@ -87,7 +87,7 @@ import { ref, reactive, onMounted } from 'vue';
 import { message } from 'ant-design-vue';
 import DataTable from '../components/common/DataTable.vue';
 import FileUploader from '../components/common/FileUploader.vue';
-import { getFileList, convertFilesToDataset } from '../services/api';
+import { getFileList, convertFilesToDataset, getFilePreview } from '../services/api';
 
 // 表格数据
 const fileList = ref([]);
@@ -191,7 +191,12 @@ const handleTableChange = (pag) => {
 const previewFile = async (record) => {
   try {
     // 真实环境应该通过API获取文件内容
-    previewContent.value = `# ${record.filename}\n\n文件内容预览...\n\n这是一个示例内容，实际应用中应该通过API获取文件内容。`;
+    const response = await getFilePreview(record.path);
+    if (response && response.content) {
+      previewContent.value = response.content;
+    } else {
+      message.error('获取文件内容失败');
+    }
     previewModalVisible.value = true;
   } catch (error) {
     message.error('获取文件内容失败');
