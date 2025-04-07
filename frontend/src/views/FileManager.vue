@@ -38,7 +38,7 @@
               预览
             </a-button>
             <a-button type="link" size="small" @click="handleSingleConvert(record)">
-              转换
+              {{ record.isDataset ? '重新转换' : '转换'}}
             </a-button>
           </a-space>
         </template>
