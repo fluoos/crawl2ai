@@ -2,14 +2,13 @@ import time
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from typing import List, Optional
 import os
-import aiohttp
 import asyncio
-from bs4 import BeautifulSoup
 from urllib.parse import urlparse
 import logging
 import json
 from multiprocessing import Process
 from pathlib import Path
+from datetime import datetime
 
 from app.schemas.crawler import CrawlerRequest, CrawlerResponse, UrlToMarkdownRequest, UrlToMarkdownResponse
 from app.api.deps import get_api_key
@@ -200,6 +199,83 @@ def convert_urls_to_markdown_process(urls, output_dir="output"):
         with open(os.path.join("output", "convert_status.json"), "w", encoding="utf-8") as f:
             json.dump({"status": "failed", "message": f"转换任务失败: {str(e)}"}, f)
         print(f"转换任务失败: {str(e)}")
+
+# 删除链接API接口
+@router.post("/delete-url", response_model=CrawlerResponse)
+async def delete_url(
+    request: UrlToMarkdownRequest,
+    api_key: str = Depends(get_api_key)
+):
+    """删除指定的URL链接"""
+    urls = [str(url) for url in request.urls]
+    if not urls:
+        return {
+            "status": "warning",
+            "message": "没有指定要删除的URL",
+            "urls": [],
+            "count": 0
+        }
+    
+    try:
+        # 确保输出目录存在
+        os.makedirs("output", exist_ok=True)
+        # JSON文件路径
+        crawled_urls_path = os.path.join("output", "crawled_urls.json")
+        deleted_count = 0
+        
+        # 检查文件是否存在
+        if os.path.exists(crawled_urls_path):
+            try:
+                # 读取现有数据
+                with open(crawled_urls_path, 'r', encoding='utf-8') as f:
+                    crawled_data = json.load(f)
+                
+                # 记录原始数量
+                original_count = len(crawled_data)
+                
+                # 过滤掉要删除的URL
+                new_data = [item for item in crawled_data 
+                           if not (isinstance(item, dict) and item.get('url') in urls)]
+                
+                # 计算删除的数量
+                deleted_count = original_count - len(new_data)
+                
+                # 保存更新后的文件
+                with open(crawled_urls_path, 'w', encoding='utf-8') as f:
+                    json.dump(new_data, f, ensure_ascii=False, indent=2)
+                
+                print(f"已从crawled_urls.json中删除 {deleted_count} 个URL")
+                    
+            except json.JSONDecodeError:
+                return {
+                    "status": "error",
+                    "message": "crawled_urls.json文件格式错误",
+                    "urls": [],
+                    "count": 0
+                }
+            except Exception as e:
+                return {
+                    "status": "error",
+                    "message": f"处理crawled_urls.json时出错: {str(e)}",
+                    "urls": [],
+                    "count": 0
+                }
+        else:
+            return {
+                "status": "warning",
+                "message": "crawled_urls.json文件不存在",
+                "urls": [],
+                "count": 0
+            }
+        
+        return {
+            "status": "success",
+            "message": f"成功删除 {deleted_count} 个URL",
+            "urls": [],
+            "count": deleted_count
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"删除URL失败: {str(e)}")
 
 # 修改API接口
 @router.post("/convert", response_model=UrlToMarkdownResponse)
@@ -476,30 +552,12 @@ async def convert_urls_to_markdown(
                 with open(filepath, 'w', encoding='utf-8') as f:
                     f.write(result.markdown)
                 print(f"已保存内容到: {filepath}")
+
+                # 更新markdown_manager.json，添加filePath字段
+                update_markdown_registry(result.url, filepath)
                 
                 # 更新crawled_urls.json，添加filePath字段
-                crawled_urls_path = os.path.join("output", "crawled_urls.json")
-                updated = False
-                
-                # 读取现有的JSON文件
-                if os.path.exists(crawled_urls_path):
-                    try:
-                        with open(crawled_urls_path, 'r', encoding='utf-8') as f:
-                            crawled_data = json.load(f)
-                            
-                        # 遍历数组，查找匹配的URL并添加filePath
-                        for item in crawled_data:
-                            if isinstance(item, dict) and item.get('url') == result.url:
-                                item['filePath'] = filepath.replace('\\', '/')  # 确保路径格式一致
-                                updated = True
-                                break
-                        
-                        # 保存更新后的文件
-                        if updated:
-                            with open(crawled_urls_path, 'w', encoding='utf-8') as f:
-                                json.dump(crawled_data, f, ensure_ascii=False, indent=2)
-                    except Exception as e:
-                        print(f"更新crawled_urls.json时出错: {str(e)}")
+                update_crawled_url_filepath(result.url, filepath)
                     
             elif result.status_code == 403 and "robots.txt" in result.error_message:
                 print(f"跳过 {result.url} - 被robots.txt阻止")
@@ -509,3 +567,110 @@ async def convert_urls_to_markdown(
                 print(f"爬取失败 {result.url}: {result.error_message}")
 
     return urls
+
+def update_crawled_url_filepath(url, filepath):
+    """
+    更新crawled_urls.json文件，为特定URL添加文件路径
+    
+    参数:
+    - url: 爬取的原始URL
+    - filepath: 保存的Markdown文件路径
+    
+    返回:
+    - bool: 是否成功更新
+    """
+    crawled_urls_path = os.path.join("output", "crawled_urls.json")
+    updated = False
+    
+    # 读取现有的JSON文件
+    if os.path.exists(crawled_urls_path):
+        try:
+            with open(crawled_urls_path, 'r', encoding='utf-8') as f:
+                crawled_data = json.load(f)
+                
+            # 遍历数组，查找匹配的URL并添加filePath
+            for item in crawled_data:
+                if isinstance(item, dict) and item.get('url') == url:
+                    item['filePath'] = filepath.replace('\\', '/')  # 确保路径格式一致
+                    updated = True
+                    break
+            
+            # 保存更新后的文件
+            if updated:
+                with open(crawled_urls_path, 'w', encoding='utf-8') as f:
+                    json.dump(crawled_data, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"更新crawled_urls.json时出错: {str(e)}")
+            return False
+    
+    return updated
+
+def update_markdown_registry(url, filepath, title=None):
+    """
+    更新Markdown文件注册表，添加或更新URL对应的文件路径
+    
+    参数:
+    - url: 爬取的原始URL
+    - filepath: 保存的Markdown文件路径
+    - title: 文档标题（可选）
+    
+    返回:
+    - bool: 是否成功更新
+    """
+    registry_path = os.path.join("output", "markdown_manager.json")
+    relative_path = filepath.replace('\\', '/')  # 确保路径格式一致
+    
+    # 创建基本文件记录
+    file_record = {
+        "url": url,
+        "filePath": relative_path,
+        "timestamp": datetime.now().isoformat(),
+        "isDataset": False
+    }
+    
+    # 如果提供了标题，添加到记录中
+    if title:
+        file_record["title"] = title
+    
+    # 确保输出目录存在
+    os.makedirs("output", exist_ok=True)
+    
+    try:
+        # 检查文件是否存在
+        if os.path.exists(registry_path):
+            # 读取现有数据
+            with open(registry_path, 'r', encoding='utf-8') as f:
+                try:
+                    registry_data = json.load(f)
+                    if not isinstance(registry_data, list):
+                        registry_data = []
+                except json.JSONDecodeError:
+                    # 文件内容不是有效的JSON
+                    registry_data = []
+        else:
+            # 文件不存在，创建新的数组
+            registry_data = []
+        
+        # 检查URL是否已存在
+        url_exists = False
+        for item in registry_data:
+            if isinstance(item, dict) and item.get('url') == url:
+                # 更新现有记录
+                item.update(file_record)
+                url_exists = True
+                break
+        
+        # 如果URL不存在，添加新记录
+        if not url_exists:
+            registry_data.append(file_record)
+        
+        # 保存更新后的注册表
+        with open(registry_path, 'w', encoding='utf-8') as f:
+            json.dump(registry_data, f, ensure_ascii=False, indent=2)
+        
+        return True
+    
+    except Exception as e:
+        print(f"更新Markdown注册表时出错: {str(e)}")
+        logging.error(f"更新Markdown注册表时出错: {str(e)}")
+        return False

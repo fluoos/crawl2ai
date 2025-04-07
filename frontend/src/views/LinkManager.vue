@@ -63,9 +63,9 @@
             </a-form-item>
           </a-col>
           <a-col :span="6">
-            <a-form-item label="重新获取内容" name="forceRefresh">
+            <a-form-item label="清空并重新获取" name="forceRefresh">
               <a-switch v-model:checked="formState.forceRefresh" />
-              <div class="form-item-hint">启用后将忽略缓存重新爬取</div>
+              <div class="form-item-hint">启用后将清除所有链接并重新爬取</div>
             </a-form-item>
           </a-col>
           <a-col :span="6">
@@ -132,6 +132,9 @@
               <a-button type="link" size="small" @click="handleSingleConvert(record)">
                 转换
               </a-button>
+              <a-button type="link" size="small" danger @click="handleDelete(record)">
+                删除
+              </a-button>
             </a-space>
           </template>
         </template>
@@ -142,9 +145,9 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue';
-import { message } from 'ant-design-vue';
+import { message, Modal } from 'ant-design-vue';
 import { ReloadOutlined } from '@ant-design/icons-vue';
-import { crawlLinks, getCrawlStatus, convertToMarkdown, stopCrawl } from '../services/api';
+import { crawlLinks, getCrawlStatus, convertToMarkdown, stopCrawl, deleteUrl } from '../services/api';
 
 // 表单状态
 const formState = reactive({
@@ -327,6 +330,36 @@ const fetchCrawlStatus = async () => {
   } finally {
     tableLoading.value = false;
   }
+};
+
+// 删除指定链接
+const handleDelete = async (record) => {
+  // 添加确认弹窗
+  Modal.confirm({
+    title: '确认删除',
+    content: `确定要删除 "${record.url}" 吗？此操作无法撤销。`,
+    okText: '确认删除',
+    okType: 'danger',
+    cancelText: '取消',
+    async onOk() {
+      try {
+        const response = await deleteUrl({
+          urls: [record.url]
+        });
+        
+        if (response.status === 'success') {
+          message.success('链接已成功删除');
+          // 删除成功后，刷新状态
+          fetchCrawlStatus();
+        } else {
+          message.error(response.message || '删除链接失败');
+        }
+      } catch (error) {
+        console.error('删除链接失败:', error);
+        message.error('删除链接失败');
+      }
+    }
+  });
 };
 
 // 表格选择变化

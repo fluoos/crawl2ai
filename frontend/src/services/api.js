@@ -81,6 +81,14 @@ export const stopCrawl = () => {
   });
 };
 
+export const deleteUrl = (params) => {
+  return request({
+    url: '/api/crawler/delete-url',
+    method: 'post',
+    data: params
+  });
+};
+
 export const getCrawlStatus = () => {
   return request({
     url: '/api/crawler/status',
@@ -152,14 +160,21 @@ export const getExportFiles = () => {
   });
 };
 
-// ------------ 新架构中的API别名 ------------
-
 // 文件管理API
 export const getFileList = (page = 1, pageSize = 10) => {
   return request({
     url: '/api/files',
     method: 'get',
     params: { page, pageSize }
+  });
+};
+
+// 文件管理API-预览 
+export const getFilePreview = (path) => {
+  return request({
+    url: '/api/files/preview',
+    method: 'get',
+    params: { path }
   });
 };
 

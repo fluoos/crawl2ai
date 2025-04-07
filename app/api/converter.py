@@ -273,5 +273,71 @@ async def convert_files_to_dataset(
         for item in results:
             f.write(json.dumps(item, ensure_ascii=False) + "\n")
     
+    # 更新markdown_manager.json中相应文件的isDataset状态
+    update_markdown_dataset_status(files)
+    
     print(f"提取了 {len(results)} 个问答对")
-    return output_path 
+    return output_path
+
+def update_markdown_dataset_status(files: List[str]) -> bool:
+    """
+    更新markdown_manager.json中文件的isDataset状态为True
+    
+    参数:
+    - files: 需要更新的文件路径列表
+    
+    返回:
+    - bool: 是否成功更新了文件
+    """
+    try:
+        manager_path = os.path.join("output", "markdown_manager.json")
+        if os.path.exists(manager_path):
+            # 读取文件内容
+            with open(manager_path, 'r', encoding='utf-8') as f:
+                try:
+                    manager_data = json.load(f)
+                    
+                    # 创建已处理文件的集合，便于快速查找
+                    processed_files = set(files)
+                    updated = False
+                    
+                    # 更新匹配的文件记录
+                    for item in manager_data:
+                        if isinstance(item, dict) and 'filePath' in item:
+                            file_path = item['filePath']
+                            
+                            # 标准化路径比较 - 统一转换为正斜杠格式并去掉前导的./
+                            norm_item_path = file_path.replace('\\', '/')
+                            if norm_item_path.startswith('./'):
+                                norm_item_path = norm_item_path[2:]
+                            
+                            # 检查是否匹配任何处理过的文件
+                            for proc_file in processed_files:
+                                norm_proc_file = proc_file.replace('\\', '/')
+                                if norm_proc_file.startswith('./'):
+                                    norm_proc_file = norm_proc_file[2:]
+                                    
+                                print(f"比较: {norm_item_path} vs {norm_proc_file}")
+                                if norm_item_path == norm_proc_file:
+                                    item['isDataset'] = True
+                                    updated = True
+                                    print(f"匹配成功: {norm_item_path} = {norm_proc_file}")
+                                    break
+                    
+                    # 只有在有更新时才写入文件
+                    if updated:
+                        with open(manager_path, 'w', encoding='utf-8') as f:
+                            json.dump(manager_data, f, ensure_ascii=False, indent=2)
+                        print(f"已更新 {manager_path} 中的文件状态")
+                        return True
+                    return False
+                except json.JSONDecodeError:
+                    logging.error(f"markdown_manager.json 格式错误，无法更新")
+                    return False
+                except Exception as e:
+                    logging.error(f"更新 markdown_manager.json 时出错: {str(e)}")
+                    return False
+        return False
+    except Exception as e:
+        logging.error(f"处理 markdown_manager.json 时出错: {str(e)}")
+        return False 
