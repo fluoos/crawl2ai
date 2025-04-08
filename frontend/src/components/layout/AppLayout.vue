@@ -38,7 +38,7 @@
     </a-layout-content>
     
     <a-layout-footer class="footer">
-      数据集生成与大模型微调工具 ©2023
+      数据集生成与大模型微调工具 ©2025
     </a-layout-footer>
   </a-layout>
 </template>
@@ -65,6 +65,9 @@ watch(() => route.path, (newPath) => {
   display: flex;
   align-items: center;
   padding: 0 24px;
+  position: fixed;
+  z-index: 1;
+  width: 100%;
 }
 
 .logo {
@@ -76,6 +79,7 @@ watch(() => route.path, (newPath) => {
 }
 
 .content {
+  margin-top: 64px;
   padding: 24px;
   background: #f0f2f5;
 }
