@@ -103,6 +103,7 @@ python -m venv venv
 # Activate environment (in PowerShell)
 .\venv\Scripts\Activate.ps1
 # Install all dependencies from requirements.txt
+pip install 'markitdown[all]'
 pip install -r requirements.txt
 ```
 

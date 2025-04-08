@@ -189,7 +189,7 @@ export const deleteFiles = (params) => {
 
 export const uploadFile = (formData) => {
   return request({
-    url: '/api/upload',
+    url: '/api/files/upload',
     method: 'post',
     data: formData,
     headers: { 'Content-Type': 'multipart/form-data' }
