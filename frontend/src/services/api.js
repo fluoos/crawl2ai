@@ -81,7 +81,7 @@ export const stopCrawl = () => {
   });
 };
 
-export const deleteUrl = (params) => {
+export const deleteUrls = (params) => {
   return request({
     url: '/api/crawler/delete-url',
     method: 'post',
@@ -175,6 +175,15 @@ export const getFilePreview = (path) => {
     url: '/api/files/preview',
     method: 'get',
     params: { path }
+  });
+};
+
+// 文件管理API-预览 
+export const deleteFiles = (params) => {
+  return request({
+    url: '/api/files/delete-file',
+    method: 'post',
+    data: params
   });
 };
 

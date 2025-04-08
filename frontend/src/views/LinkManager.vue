@@ -130,7 +130,7 @@
           <template v-if="column.dataIndex === 'action'">
             <a-space>
               <a-button type="link" size="small" @click="handleSingleConvert(record)">
-                转换
+                {{ record.filePath ? '重新转换' : '转换' }}
               </a-button>
               <a-button type="link" size="small" danger @click="handleDelete(record)">
                 删除
@@ -147,7 +147,7 @@
 import { ref, reactive, onMounted } from 'vue';
 import { message, Modal } from 'ant-design-vue';
 import { ReloadOutlined } from '@ant-design/icons-vue';
-import { crawlLinks, getCrawlStatus, convertToMarkdown, stopCrawl, deleteUrl } from '../services/api';
+import { crawlLinks, getCrawlStatus, convertToMarkdown, stopCrawl, deleteUrls } from '../services/api';
 
 // 表单状态
 const formState = reactive({
@@ -343,7 +343,7 @@ const handleDelete = async (record) => {
     cancelText: '取消',
     async onOk() {
       try {
-        const response = await deleteUrl({
+        const response = await deleteUrls({
           urls: [record.url]
         });
         
