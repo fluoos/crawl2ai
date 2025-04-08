@@ -95,6 +95,7 @@ python -m venv venv
 # 激活环境（在PowerShell中）
 .\venv\Scripts\Activate.ps1
 # 从requirements.txt安装所有依赖
+pip install 'markitdown[all]'
 pip install -r requirements.txt
 ```
 

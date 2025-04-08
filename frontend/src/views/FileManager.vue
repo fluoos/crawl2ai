@@ -8,14 +8,19 @@
     
     <a-card title="Markdown文件列表" class="card-wrapper">
       <template #extra>
-        <a-button
-          type="primary"
-          :disabled="!selectedFiles.length"
-          @click="handleConvertFiles"
-          :loading="convertLoading"
-        >
-          转换为数据集
-        </a-button>
+        <a-space>
+          <a-button @click="fetchFileList">
+            <ReloadOutlined /> 刷新列表
+          </a-button>
+          <a-button
+            type="primary"
+            :disabled="!selectedFiles.length"
+            @click="handleConvertFiles"
+            :loading="convertLoading"
+          >
+            转换为数据集
+          </a-button>
+        </a-space>
       </template>
       
       <DataTable
@@ -39,6 +44,9 @@
             </a-button>
             <a-button type="link" size="small" @click="handleSingleConvert(record)">
               {{ record.isDataset ? '重新转换' : '转换'}}
+            </a-button>
+            <a-button type="link" size="small" danger @click="handleDelete(record)">
+              删除
             </a-button>
           </a-space>
         </template>
@@ -84,10 +92,11 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue';
-import { message } from 'ant-design-vue';
+import { message, Modal } from 'ant-design-vue';
+import { ReloadOutlined } from '@ant-design/icons-vue';
 import DataTable from '../components/common/DataTable.vue';
 import FileUploader from '../components/common/FileUploader.vue';
-import { getFileList, convertFilesToDataset, getFilePreview } from '../services/api';
+import { getFileList, convertFilesToDataset, getFilePreview, deleteFiles } from '../services/api';
 
 // 表格数据
 const fileList = ref([]);
@@ -137,7 +146,7 @@ const columns = [
   {
     title: '操作',
     dataIndex: 'action',
-    width: 150,
+    width: 210,
     fixed: 'right'
   }
 ];
@@ -248,6 +257,36 @@ const confirmConvert = async () => {
     convertLoading.value = false;
   }
 };
+
+// 删除指定文件
+const handleDelete = async (record) => {
+  // 添加确认弹窗
+  Modal.confirm({
+    title: '确认删除',
+    content: `确定要删除 "${record.filename}" 吗？此操作无法撤销。`,
+    okText: '确认删除',
+    okType: 'danger',
+    cancelText: '取消',
+    async onOk() {
+      try {
+        const response = await deleteFiles({
+          files: [record.filename]
+        });
+        
+        if (response.status === 'success') {
+          message.success('文件已成功删除');
+          // 删除成功后，刷新列表
+          fetchFileList();
+        } else {
+          message.error(response.message || '删除文件失败');
+        }
+      } catch (error) {
+        console.error('删除文件失败:', error);
+        message.error('删除文件失败');
+      }
+    }
+  });
+}
 
 // 格式化文件大小
 const formatFileSize = (bytes) => {

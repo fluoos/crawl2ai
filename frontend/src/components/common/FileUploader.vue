@@ -93,7 +93,7 @@ const handleUpload = async () => {
   const formData = new FormData();
   
   fileList.value.forEach(file => {
-    formData.append('files[]', file.originFileObj);
+    formData.append('files', file.originFileObj);
   });
   
   try {

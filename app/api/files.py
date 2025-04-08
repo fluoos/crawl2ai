@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Query
 from fastapi.responses import JSONResponse
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 import os
 import datetime
 import shutil
@@ -135,40 +135,264 @@ async def preview_file(path: str = Query(...)):
 
 @router.post("/upload")
 async def upload_files(files: List[UploadFile] = File(...)):
-    """上传文件"""
+    """上传文件，非Markdown文件会被自动转换"""
     try:
+        # 确保目录存在
         upload_dir = "upload"
+        markdown_dir = os.path.join("output", "markdown")
         os.makedirs(upload_dir, exist_ok=True)
+        os.makedirs(markdown_dir, exist_ok=True)
         
         uploaded_files = []
+        converted_files = []
         
         for file in files:
-            # 确保文件是Markdown格式
-            if not file.filename.endswith(".md"):
-                return JSONResponse(
-                    status_code=400,
-                    content={"detail": f"文件 {file.filename} 不是Markdown格式"}
-                )
+            # 原始文件保存路径
+            original_path = os.path.join(upload_dir, file.filename)
             
-            file_path = os.path.join(upload_dir, file.filename)
-            
-            # 保存文件
-            with open(file_path, "wb") as f:
+            # 保存原始文件
+            with open(original_path, "wb") as f:
                 shutil.copyfileobj(file.file, f)
             
-            uploaded_files.append({
-                "filename": file.filename,
-                "path": file_path,
-                "size": os.stat(file_path).st_size
-            })
-        # TODO 将上传的文件转换为markdown文件
-        # 使用进程来执行转换任务
+            # 检查文件类型
+            if file.filename.endswith(".md"):
+                # 如果已经是Markdown，直接复制到markdown目录
+                markdown_path = os.path.join(markdown_dir, file.filename)
+                shutil.copy2(original_path, markdown_path)
+                
+                uploaded_files.append({
+                    "filename": file.filename,
+                    "path": markdown_path,
+                    "size": os.stat(markdown_path).st_size,
+                    "converted": False
+                })
+            else:
+                # 非Markdown文件，需要转换
+                try:
+                    # 引入MarkItDown库
+                    from markitdown import MarkItDown
+                    md = MarkItDown()
+                    # 使用MarkItDown转换
+                    result = md.convert(original_path)
+                    
+                    # 创建新的Markdown文件名
+                    base_name = os.path.splitext(file.filename)[0]
+                    markdown_filename = f"{base_name}.md"
+                    markdown_path = os.path.join(markdown_dir, markdown_filename)
+                    
+                    # 写入转换后的内容
+                    with open(markdown_path, "w", encoding="utf-8") as f:
+                        f.write(result.text_content)
+                    
+                    # 添加到转换文件列表
+                    converted_files.append({
+                        "original_filename": file.filename,
+                        "markdown_filename": markdown_filename,
+                        "path": markdown_path,
+                        "size": os.stat(markdown_path).st_size
+                    })
+                    
+                    # 更新markdown_manager.json
+                    update_markdown_registry(original_path, markdown_path, base_name)
+                    
+                except Exception as e:
+                    print(f"转换文件 {file.filename} 失败: {str(e)}")
+                    # 仍然添加到上传文件列表，但标记转换失败
+                    uploaded_files.append({
+                        "filename": file.filename,
+                        "path": original_path,
+                        "size": os.stat(original_path).st_size,
+                        "converted": False,
+                        "error": str(e)
+                    })
+                    continue
         
         return {
             "status": "success",
-            "message": f"成功上传 {len(uploaded_files)} 个文件",
-            "files": uploaded_files
+            "message": f"成功上传 {len(uploaded_files) + len(converted_files)} 个文件，其中 {len(converted_files)} 个被转换为Markdown",
+            "uploaded_files": uploaded_files,
+            "converted_files": converted_files
         }
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) 
+        raise HTTPException(status_code=500, detail=str(e))
+
+def update_markdown_registry(original_path, markdown_path, title=None):
+    """更新markdown_manager.json记录"""
+    try:
+        manager_path = os.path.join("output", "markdown_manager.json")
+        relative_path = markdown_path.replace('\\', '/')
+        
+        # 创建记录
+        file_record = {
+            "filePath": relative_path,
+            "originalPath": original_path.replace('\\', '/'),
+            "timestamp": datetime.datetime.now().isoformat(),
+            "isDataset": False,
+            "isConverted": True
+        }
+        
+        if title:
+            file_record["title"] = title
+        
+        # 确保目录存在
+        os.makedirs("output", exist_ok=True)
+        
+        # 读取或创建manager数据
+        manager_data = []
+        if os.path.exists(manager_path):
+            try:
+                with open(manager_path, 'r', encoding='utf-8') as f:
+                    manager_data = json.load(f)
+                    if not isinstance(manager_data, list):
+                        manager_data = []
+            except json.JSONDecodeError:
+                manager_data = []
+        
+        # 添加新记录
+        manager_data.append(file_record)
+        
+        # 保存更新后的manager数据
+        with open(manager_path, 'w', encoding='utf-8') as f:
+            json.dump(manager_data, f, ensure_ascii=False, indent=2)
+        
+        return True
+    except Exception as e:
+        print(f"更新markdown_manager.json时出错: {str(e)}")
+        return False
+
+# 删除文件接口
+@router.post("/delete-file")
+async def delete_files(data: Dict[str, Any]):
+    """删除指定的文件，同时更新markdown_manager.json和crawled_urls.json"""
+    try:
+        files = data.get("files", [])
+        if not files:
+            return {
+                "status": "warning",
+                "message": "没有指定要删除的文件"
+            }
+        
+        manager_path = os.path.join("output", "markdown_manager.json")
+        crawled_urls_path = os.path.join("output", "crawled_urls.json")
+        deleted_files = []
+        failed_files = []
+        
+        # 读取markdown_manager.json
+        manager_data = []
+        if os.path.exists(manager_path):
+            try:
+                with open(manager_path, 'r', encoding='utf-8') as f:
+                    manager_data = json.load(f)
+            except Exception as e:
+                print(f"读取markdown_manager.json出错: {str(e)}")
+                return {
+                    "status": "error",
+                    "message": f"读取文件记录失败: {str(e)}"
+                }
+        
+        # 处理每个要删除的文件
+        for filename in files:
+            # 查找文件在manager中的记录
+            file_entries = [item for item in manager_data if isinstance(item, dict) 
+                           and 'filePath' in item 
+                           and os.path.basename(item['filePath']) == filename]
+            
+            if file_entries:
+                for entry in file_entries:
+                    file_path = entry['filePath']
+                    
+                    # 标准化路径
+                    if not os.path.isabs(file_path):
+                        file_path = os.path.join(".", file_path)
+                    
+                    # 尝试删除物理文件
+                    try:
+                        if os.path.exists(file_path):
+                            os.remove(file_path)
+                            deleted_files.append(filename)
+                        else:
+                            # 文件不存在，但仍然从记录中删除
+                            deleted_files.append(filename)
+                    except Exception as e:
+                        print(f"删除文件 {file_path} 失败: {str(e)}")
+                        failed_files.append(filename)
+            else:
+                # 如果在manager中找不到，尝试在markdown目录下查找
+                potential_paths = [
+                    os.path.join("output", "markdown", filename),
+                    os.path.join(".", "output", "markdown", filename)
+                ]
+                
+                deleted = False
+                for path in potential_paths:
+                    if os.path.exists(path):
+                        try:
+                            os.remove(path)
+                            deleted_files.append(filename)
+                            deleted = True
+                            break
+                        except Exception as e:
+                            print(f"删除文件 {path} 失败: {str(e)}")
+                
+                if not deleted:
+                    failed_files.append(filename)
+        
+        # 从manager_data中移除已删除文件的记录
+        if deleted_files:
+            new_manager_data = [item for item in manager_data 
+                               if not (isinstance(item, dict) 
+                                      and 'filePath' in item 
+                                      and os.path.basename(item['filePath']) in deleted_files)]
+            
+            # 保存更新后的manager_data
+            if len(new_manager_data) != len(manager_data):
+                with open(manager_path, 'w', encoding='utf-8') as f:
+                    json.dump(new_manager_data, f, ensure_ascii=False, indent=2)
+        
+        # 更新crawled_urls.json中的filePath字段
+        if deleted_files and os.path.exists(crawled_urls_path):
+            try:
+                with open(crawled_urls_path, 'r', encoding='utf-8') as f:
+                    crawled_data = json.load(f)
+                
+                updated = False
+                for item in crawled_data:
+                    if isinstance(item, dict) and 'filePath' in item:
+                        file_name = os.path.basename(item['filePath'])
+                        if file_name in deleted_files:
+                            # 将filePath设置为空
+                            item['filePath'] = ''
+                            updated = True
+                
+                # 只有在有更新时才保存文件
+                if updated:
+                    with open(crawled_urls_path, 'w', encoding='utf-8') as f:
+                        json.dump(crawled_data, f, ensure_ascii=False, indent=2)
+                    print(f"已更新 {crawled_urls_path} 中的文件路径")
+            except Exception as e:
+                print(f"更新crawled_urls.json时出错: {str(e)}")
+        
+        # 构建响应消息
+        if deleted_files and not failed_files:
+            return {
+                "status": "success",
+                "message": f"成功删除 {len(deleted_files)} 个文件",
+                "deleted": deleted_files
+            }
+        elif deleted_files and failed_files:
+            return {
+                "status": "partial",
+                "message": f"成功删除 {len(deleted_files)} 个文件，{len(failed_files)} 个文件删除失败",
+                "deleted": deleted_files,
+                "failed": failed_files
+            }
+        else:
+            return {
+                "status": "error",
+                "message": f"所有 {len(failed_files)} 个文件删除失败",
+                "failed": failed_files
+            }
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"删除文件失败: {str(e)}") 
