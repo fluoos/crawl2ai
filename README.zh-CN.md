@@ -1,13 +1,13 @@
 # 数据集生成、大模型微调工具
 
-这是一个数据集生成的工具，一键爬取指定域名的链接，支持把链接转换成大模型友好的markdown文件，支持将markdown文件通过ChatGPT、deepseek、Gemma等大模型转换成训练大模型可用的数据集。
+大模型数据集生成和微调工具，一键爬取指定域名的链接，支持把链接转换成大模型友好的markdown文件，支持将markdown文件通过ChatGPT、deepseek、Gemma等大模型转换成训练大模型可用的数据集。
 
 ## 功能特点
 
-- 支持一键爬取指定域名的链接
-- 支持把链接转换成大模型友好的markdown文件
+- 支持深度爬取指定域名的所有链接
+- 支持将链接转换成大模型友好的markdown文件
 - 支持上传.md、.txt、.pdf、.docx、.doc等文件，自动转换成.md文件
-- 支持将markdown文件通过ChatGPT、deepseek、Gemma等大模型转换成训练大模型可用的数据集
+- 支持通过ChatGPT、deepseek、Gemma等大模型将markdown转换成训练大模型可用的数据集
 - 支持导出 JSONL 和 JSON 两种输出格式
 - 支持导出 Alpaca、ShareGPT 和自定义格式
 - 支持预览转换结果
@@ -95,7 +95,6 @@ python -m venv venv
 # 激活环境（在PowerShell中）
 .\venv\Scripts\Activate.ps1
 # 从requirements.txt安装所有依赖
-pip install 'markitdown[all]'
 pip install -r requirements.txt
 ```
 
@@ -123,16 +122,6 @@ npm run dev
 
 3. 在浏览器中访问：`http://localhost:3000`
 
-## 使用方法
-
-1. 在界面中选择导出格式（JSONL或JSON）
-2. 选择数据集风格（Alpaca、ShareGPT或自定义）
-3. 如果选择自定义格式，配置字段映射
-4. 输入输出文件名
-5. 点击"预览"按钮查看转换结果
-6. 点击"导出"按钮生成文件
-7. 导出完成后，点击"下载"按钮获取文件
-
 ## 输入数据格式
 
 输入文件 `output/qa_dataset.jsonl` 应为JSONL格式，每行包含一个JSON对象，要求包含以下字段：
@@ -150,3 +139,15 @@ npm run dev
 1. **Alpaca格式**：适用于指令微调
 2. **ShareGPT格式**：适用于对话微调
 3. **自定义格式**：可自定义字段映射
+
+## 常见问题处理
+
+1. 运行过程如果提示下面报错
+No module named 'markitdown'
+No module named 'onnxruntime'
+
+可以尝试在全局安装
+```bash
+pip install 'markitdown[all]'
+pip install onnxruntime
+```

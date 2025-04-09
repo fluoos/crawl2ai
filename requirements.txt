@@ -9,5 +9,5 @@ flask==2.0.1
 flask-cors==3.0.10
 werkzeug==2.0.1
 chardet==4.0.0
-markitdown==0.1.1
+markitdown[all]
 onnxruntime==1.21.0
