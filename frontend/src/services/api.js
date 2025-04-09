@@ -1,60 +1,34 @@
 import request from './request';
 
-// ------------ 原有API功能 ------------
-
-// 基础格式API
-export const getFormats = () => {
-  return request({
-    url: '/api/formats',
-    method: 'get'
-  });
-};
-
-export const getExamples = () => {
-  return request({
-    url: '/api/examples',
-    method: 'get'
-  });
-};
-
+// 数据集管理-数据列表
 export const previewData = (params) => {
   console.log('预览数据请求参数:', params);
   
   return request({
-    url: '/api/preview',
+    url: '/api/dataset/list',
     method: 'post',
     data: params
   });
 };
 
+// 数据集管理-导出数据
 export const exportData = (options) => {
   return request({
-    url: '/api/export',
+    url: '/api/dataset/export',
     method: 'post',
     data: options
   });
 };
 
-export const getDownloadUrl = (filename) => {
-  return `${request.defaults.baseURL}/api/download/${filename}`;
-};
-
+// 数据集管理-获取数据统计
 export const getDataStats = () => {
   return request({
-    url: '/api/stats',
+    url: '/api/dataset/stats',
     method: 'get'
   });
 };
 
-export const batchExport = (options) => {
-  return request({
-    url: '/api/batch-export',
-    method: 'post',
-    data: options
-  });
-};
-
-// 爬虫API
+// 链接管理-开始爬取链接
 export const crawlLinks = (params) => {
   // 转换参数命名风格为snake_case
   const apiParams = {
@@ -74,6 +48,7 @@ export const crawlLinks = (params) => {
   });
 };
 
+// 链接管理-停止爬取
 export const stopCrawl = () => {
   return request({
     url: '/api/crawler/stop-crawl',
@@ -81,6 +56,7 @@ export const stopCrawl = () => {
   });
 };
 
+// 链接管理-删除链接
 export const deleteUrls = (params) => {
   return request({
     url: '/api/crawler/delete-url',
@@ -89,6 +65,7 @@ export const deleteUrls = (params) => {
   });
 };
 
+// 链接管理-获取状态和链接列表
 export const getCrawlStatus = () => {
   return request({
     url: '/api/crawler/status',
@@ -96,7 +73,7 @@ export const getCrawlStatus = () => {
   });
 };
 
-// 转换API
+// 链接管理-转换成markdown文件
 export const convertToMarkdown = (params) => {
   return request({
     url: '/api/crawler/convert',
@@ -105,6 +82,7 @@ export const convertToMarkdown = (params) => {
   });
 };
 
+// 文件管理-转换文件
 export const convertToDataset = (files, model, outputFile) => {
   return request({
     url: '/api/converter/convert',
@@ -117,50 +95,7 @@ export const convertToDataset = (files, model, outputFile) => {
   });
 };
 
-export const getConversionStatus = (outputFile) => {
-  return request({
-    url: '/api/converter/status',
-    method: 'get',
-    params: { output_file: outputFile }
-  });
-};
-
-// 导出API
-export const previewDataset = (format, style, inputFile, mapping) => {
-  return request({
-    url: '/api/export/preview',
-    method: 'post',
-    data: {
-      format,
-      style,
-      input_file: inputFile,
-      mapping
-    }
-  });
-};
-
-export const exportDataset = (format, style, inputFile, outputFile, mapping) => {
-  return request({
-    url: '/api/export/export',
-    method: 'post',
-    data: {
-      format,
-      style,
-      input_file: inputFile,
-      output_file: outputFile,
-      mapping
-    }
-  });
-};
-
-export const getExportFiles = () => {
-  return request({
-    url: '/api/export/files',
-    method: 'get'
-  });
-};
-
-// 文件管理API
+// 文件管理-列表
 export const getFileList = (page = 1, pageSize = 10) => {
   return request({
     url: '/api/files',
@@ -169,7 +104,7 @@ export const getFileList = (page = 1, pageSize = 10) => {
   });
 };
 
-// 文件管理API-预览 
+// 文件管理-预览 
 export const getFilePreview = (path) => {
   return request({
     url: '/api/files/preview',
@@ -178,7 +113,7 @@ export const getFilePreview = (path) => {
   });
 };
 
-// 文件管理API-预览 
+// 文件管理-删除文件 
 export const deleteFiles = (params) => {
   return request({
     url: '/api/files/delete-file',
@@ -187,6 +122,7 @@ export const deleteFiles = (params) => {
   });
 };
 
+// 文件管理-上传文件 
 export const uploadFile = (formData) => {
   return request({
     url: '/api/files/upload',
@@ -196,12 +132,7 @@ export const uploadFile = (formData) => {
   });
 };
 
-// 将convertToDataset重命名为convertFilesToDataset以适应新架构
-export const convertFilesToDataset = (files, model, outputFile) => {
-  return convertToDataset(files, model, outputFile);
-};
-
-// 系统配置API
+// 系统配置-获取
 export const getSystemConfig = () => {
   // 暂时模拟返回结果
   return Promise.resolve({
@@ -214,6 +145,7 @@ export const getSystemConfig = () => {
   });
 };
 
+// 系统配置-更新
 export const updateSystemConfig = (config) => {
   // 暂时模拟保存
   if (config.apiKey) {

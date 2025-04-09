@@ -47,56 +47,6 @@ async def convert_files(
     
     return {"status": "success", "message": "转换任务已开始"}
 
-@router.get("/status")
-async def get_conversion_status(output_file: str = Query("qa_dataset.jsonl")):
-    """获取转换状态和结果"""
-    if output_file not in conversion_state:
-        # 检查文件是否已存在
-        file_path = os.path.join("output", output_file)
-        if os.path.exists(file_path):
-            # 读取前5行作为示例
-            sample_data = []
-            try:
-                with open(file_path, "r", encoding="utf-8") as f:
-                    for i, line in enumerate(f):
-                        if i >= 5:
-                            break
-                        sample_data.append(json.loads(line))
-                
-                return {
-                    "status": "completed",
-                    "message": "转换已完成",
-                    "output_file": output_file,
-                    "sample": sample_data
-                }
-            except Exception as e:
-                logging.error(f"读取样本数据失败: {str(e)}")
-        
-        return {
-            "status": "unknown",
-            "message": "未找到转换任务或文件",
-            "output_file": output_file
-        }
-    
-    status_info = conversion_state[output_file]
-    
-    # 如果转换已完成，读取样本数据
-    if status_info["status"] == "completed":
-        file_path = os.path.join("output", output_file)
-        sample_data = []
-        try:
-            with open(file_path, "r", encoding="utf-8") as f:
-                for i, line in enumerate(f):
-                    if i >= 5:
-                        break
-                    sample_data.append(json.loads(line))
-            
-            status_info["sample"] = sample_data
-        except Exception as e:
-            logging.error(f"读取样本数据失败: {str(e)}")
-    
-    return status_info
-
 # 后台任务
 async def convert_files_to_dataset_task(files, model, output_file):
     """转换文件到数据集的后台任务"""
