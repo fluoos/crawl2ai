@@ -44,9 +44,14 @@
     
     <a-card title="数据集问答对" class="card-wrapper">
       <template #extra>
-        <a-button type="primary" @click="showExportDialog">
-          <ExportOutlined /> 导出数据集
-        </a-button>
+        <a-space>
+          <a-button @click="fetchQAList">
+            <ReloadOutlined /> 刷新列表
+          </a-button>
+          <a-button type="primary" @click="showExportDialog">
+            <ExportOutlined /> 导出数据集
+          </a-button>
+        </a-space>
       </template>
       
       <!-- 使用Ant Design表格替代虚拟滚动列表 -->
@@ -84,7 +89,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue';
 import { message } from 'ant-design-vue';
-import { DatabaseOutlined, CheckCircleOutlined, BarChartOutlined, ExportOutlined } from '@ant-design/icons-vue';
+import { DatabaseOutlined, CheckCircleOutlined, BarChartOutlined, ExportOutlined, ReloadOutlined } from '@ant-design/icons-vue';
 import ExportDialog from '../components/business/ExportDialog.vue';
 import { getDataStats, previewData } from '../services/api';
 
