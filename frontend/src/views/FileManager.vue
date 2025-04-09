@@ -96,7 +96,7 @@ import { message, Modal } from 'ant-design-vue';
 import { ReloadOutlined } from '@ant-design/icons-vue';
 import DataTable from '../components/common/DataTable.vue';
 import FileUploader from '../components/common/FileUploader.vue';
-import { getFileList, convertFilesToDataset, getFilePreview, deleteFiles } from '../services/api';
+import { getFileList, convertToDataset, getFilePreview, deleteFiles } from '../services/api';
 
 // 表格数据
 const fileList = ref([]);
@@ -180,7 +180,6 @@ const fetchFileList = async () => {
 // 文件上传成功处理
 const handleUploadSuccess = () => {
   fetchFileList();
-  message.success('文件上传成功');
 };
 
 // 表格选择变化
@@ -238,7 +237,7 @@ const confirmConvert = async () => {
   
   convertLoading.value = true;
   try {
-    const response = await convertFilesToDataset(
+    const response = await convertToDataset(
       convertForm.files,
       convertForm.model,
       convertForm.outputFile

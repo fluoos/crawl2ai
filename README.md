@@ -8,14 +8,14 @@
 
 # Dataset Generation and Large Model Fine-tuning Tool
 
-This is a tool for generating datasets that can crawl links from specified domains with one click. It supports converting links into markdown files that are friendly for large models and allows these markdown files to be converted into datasets suitable for training large models using ChatGPT, deepseek, Gemma, etc.
+A large model dataset generation and fine-tuning tool that can crawl links from specified domains with one click, convert links into markdown files friendly for large models, and support converting markdown files into datasets suitable for training large models using ChatGPT, deepseek, Gemma, and other large models.
 
 ## Features
 
-- Supports one-click crawling of links from specified domains
-- Supports converting links into markdown files that are friendly for large models
+- Supports deep crawling of all links from specified domains
+- Supports converting links into markdown files friendly for large models
 - Supports uploading .md, .txt, .pdf, .docx, .doc and other files, automatically converting them to .md files
-- Supports converting markdown files into datasets suitable for training large models using ChatGPT, deepseek, Gemma, etc.
+- Supports converting markdown files into datasets suitable for training large models using ChatGPT, deepseek, Gemma, and other large models
 - Supports exporting in both JSONL and JSON formats
 - Supports exporting in Alpaca, ShareGPT, and custom formats
 - Supports previewing conversion results
@@ -103,7 +103,6 @@ python -m venv venv
 # Activate environment (in PowerShell)
 .\venv\Scripts\Activate.ps1
 # Install all dependencies from requirements.txt
-pip install 'markitdown[all]'
 pip install -r requirements.txt
 ```
 
@@ -131,16 +130,6 @@ npm run dev
 
 3. Access in the browser: `http://localhost:3000`
 
-## Usage
-
-1. Select the export format (JSONL or JSON) in the interface.
-2. Choose the dataset style (Alpaca, ShareGPT, or custom).
-3. If you choose a custom format, configure the field mapping.
-4. Enter the output file name.
-5. Click the "Preview" button to view the conversion results.
-6. Click the "Export" button to generate the file.
-7. After exporting is complete, click the "Download" button to obtain the file.
-
 ## Input Data Format
 
 The input file `output/qa_dataset.jsonl` should be in JSONL format, with each line containing a JSON object that must include the following fields:
@@ -155,6 +144,18 @@ The input file `output/qa_dataset.jsonl` should be in JSONL format, with each li
 
 ## Supported Output Formats
 
-1. **Alpaca format**: Suitable for instruction fine-tuning.
-2. **ShareGPT format**: Suitable for dialogue fine-tuning.
-3. **Custom format**: Customizable field mapping.
+1. **Alpaca format**: Suitable for instruction fine-tuning
+2. **ShareGPT format**: Suitable for dialogue fine-tuning
+3. **Custom format**: Customizable field mapping
+
+## Troubleshooting
+
+1. If you encounter the following errors during execution:
+   No module named 'markitdown'
+   No module named 'onnxruntime'
+
+   You can try installing globally:
+   ```bash
+   pip install 'markitdown[all]'
+   pip install onnxruntime
+   ```

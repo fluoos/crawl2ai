@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import os
 
-from app.api import crawler, files, converter, common, system
+from app.api import crawler, files, converter, common, system, dataset
 
 # 确保必要的目录存在
 for dir_path in ["output", "upload", "export", "config"]:
@@ -29,37 +29,12 @@ app.add_middleware(
 )
 
 # 注册路由
-app.include_router(crawler.router, prefix="/api/crawler", tags=["爬虫"])
-app.include_router(files.router, prefix="/api/files", tags=["文件"])
-app.include_router(converter.router, prefix="/api/converter", tags=["转换"])
 app.include_router(common.router, prefix="/api", tags=["通用"])
-app.include_router(system.router, prefix="/api/system", tags=["系统"])
-
-# 注册无前缀路由 - 为了兼容前端
-# 因为前端有些请求直接访问 /api/formats 而不是 /formats
-@app.get("/api/formats")
-async def api_formats():
-    return await common.get_formats()
-
-@app.get("/api/examples")
-async def api_examples():
-    return await common.get_format_examples()
-
-@app.get("/api/stats")
-async def api_stats():
-    return await common.get_stats()
-
-@app.post("/api/preview")
-async def api_preview(params: dict):
-    return await common.preview_data(params)
-
-@app.post("/api/export")
-async def api_export(options: dict):
-    return await common.export_data(options)
-
-@app.get("/api/download/{style}/{filename}")
-async def api_download(style: str, filename: str):
-    return await common.download_file(style, filename)
+app.include_router(crawler.router, prefix="/api/crawler", tags=["链接爬虫"])
+app.include_router(files.router, prefix="/api/files", tags=["文件管理"])
+app.include_router(converter.router, prefix="/api/converter", tags=["文件转换"])
+app.include_router(dataset.router, prefix="/api/dataset", tags=["数据集管理"])
+app.include_router(system.router, prefix="/api/system", tags=["系统配置"])
 
 # 挂载静态文件
 app.mount("/output", StaticFiles(directory="output"), name="output")

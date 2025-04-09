@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Query
 from fastapi.responses import JSONResponse
-from typing import List, Optional, Dict, Any
+from typing import List, Dict, Any
 import os
 import datetime
 import shutil
@@ -160,6 +160,10 @@ async def upload_files(files: List[UploadFile] = File(...)):
                 markdown_path = os.path.join(markdown_dir, file.filename)
                 shutil.copy2(original_path, markdown_path)
                 
+                # 更新markdown_manager.json
+                base_name = os.path.splitext(file.filename)[0]
+                update_markdown_registry(original_path, markdown_path, base_name, is_converted=False)
+                
                 uploaded_files.append({
                     "filename": file.filename,
                     "path": markdown_path,
@@ -168,44 +172,22 @@ async def upload_files(files: List[UploadFile] = File(...)):
                 })
             else:
                 # 非Markdown文件，需要转换
-                try:
-                    # 引入MarkItDown库
-                    from markitdown import MarkItDown
-                    md = MarkItDown()
-                    # 使用MarkItDown转换
-                    result = md.convert(original_path)
-                    
-                    # 创建新的Markdown文件名
-                    base_name = os.path.splitext(file.filename)[0]
-                    markdown_filename = f"{base_name}.md"
-                    markdown_path = os.path.join(markdown_dir, markdown_filename)
-                    
-                    # 写入转换后的内容
-                    with open(markdown_path, "w", encoding="utf-8") as f:
-                        f.write(result.text_content)
-                    
-                    # 添加到转换文件列表
-                    converted_files.append({
-                        "original_filename": file.filename,
-                        "markdown_filename": markdown_filename,
-                        "path": markdown_path,
-                        "size": os.stat(markdown_path).st_size
-                    })
-                    
-                    # 更新markdown_manager.json
-                    update_markdown_registry(original_path, markdown_path, base_name)
-                    
-                except Exception as e:
-                    print(f"转换文件 {file.filename} 失败: {str(e)}")
-                    # 仍然添加到上传文件列表，但标记转换失败
+                conversion_result = convert_to_markdown(
+                    original_path=original_path,
+                    markdown_dir=markdown_dir,
+                    filename=file.filename
+                )
+                
+                if conversion_result["success"]:
+                    converted_files.append(conversion_result["file_info"])
+                else:
                     uploaded_files.append({
                         "filename": file.filename,
                         "path": original_path,
                         "size": os.stat(original_path).st_size,
                         "converted": False,
-                        "error": str(e)
+                        "error": conversion_result["error"]
                     })
-                    continue
         
         return {
             "status": "success",
@@ -217,8 +199,75 @@ async def upload_files(files: List[UploadFile] = File(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-def update_markdown_registry(original_path, markdown_path, title=None):
-    """更新markdown_manager.json记录"""
+def convert_to_markdown(original_path: str, markdown_dir: str, filename: str) -> Dict[str, Any]:
+    """
+    将非Markdown文件转换为Markdown格式
+    
+    参数:
+    - original_path: 原始文件的完整路径
+    - markdown_dir: Markdown文件的存储目录
+    - filename: 原始文件名
+    
+    返回:
+    - Dict: 包含以下字段:
+      - success: 布尔值，表示转换是否成功
+      - file_info: 转换成功时，包含转换后文件信息的字典
+      - error: 转换失败时的错误信息
+    
+    注意:
+    该函数使用markitdown库进行文件转换，支持多种格式如docx、pdf等转为markdown
+    """
+    try:        
+        # 引入MarkItDown库
+        from markitdown import MarkItDown
+        md = MarkItDown()
+        # 使用MarkItDown转换
+        result = md.convert(original_path)
+        
+        # 创建新的Markdown文件名
+        base_name = os.path.splitext(filename)[0]
+        markdown_filename = f"{base_name}.md"
+        markdown_path = os.path.join(markdown_dir, markdown_filename)
+        
+        # 写入转换后的内容
+        with open(markdown_path, "w", encoding="utf-8") as f:
+            f.write(result.text_content)
+        
+        # 构建文件信息
+        file_info = {
+            "original_filename": filename,
+            "markdown_filename": markdown_filename,
+            "path": markdown_path,
+            "size": os.stat(markdown_path).st_size
+        }
+        
+        # 更新markdown_manager.json
+        update_markdown_registry(original_path, markdown_path, base_name, is_converted=True)
+        
+        return {
+            "success": True,
+            "file_info": file_info,
+            "error": None
+        }
+        
+    except Exception as e:
+        print(f"转换文件 {filename} 失败: {str(e)}")
+        return {
+            "success": False,
+            "file_info": None,
+            "error": str(e)
+        }
+
+def update_markdown_registry(original_path, markdown_path, title=None, is_converted=True):
+    """
+    更新markdown_manager.json记录
+    
+    参数:
+    - original_path: 原始文件路径
+    - markdown_path: Markdown文件路径
+    - title: 文件标题，默认为None
+    - is_converted: 是否是转换而来的，还是本来就是markdown文件
+    """
     try:
         manager_path = os.path.join("output", "markdown_manager.json")
         relative_path = markdown_path.replace('\\', '/')
@@ -229,7 +278,7 @@ def update_markdown_registry(original_path, markdown_path, title=None):
             "originalPath": original_path.replace('\\', '/'),
             "timestamp": datetime.datetime.now().isoformat(),
             "isDataset": False,
-            "isConverted": True
+            "isConverted": is_converted
         }
         
         if title:
@@ -240,22 +289,43 @@ def update_markdown_registry(original_path, markdown_path, title=None):
         
         # 读取或创建manager数据
         manager_data = []
-        if os.path.exists(manager_path):
+        file_exists = os.path.exists(manager_path)
+        
+        if file_exists:
             try:
                 with open(manager_path, 'r', encoding='utf-8') as f:
                     manager_data = json.load(f)
                     if not isinstance(manager_data, list):
+                        print(f"警告: {manager_path} 格式不正确，重置为空列表")
                         manager_data = []
             except json.JSONDecodeError:
+                print(f"警告: {manager_path} JSON解析错误，重置为空列表")
                 manager_data = []
+        else:
+            print(f"注意: {manager_path} 不存在，将创建新文件")
         
-        # 添加新记录
-        manager_data.append(file_record)
+        # 检查文件是否已存在，避免重复
+        found_existing = False
+        for i, item in enumerate(manager_data):
+            if (isinstance(item, dict) and 
+                item.get('filePath') == relative_path):
+                # 更新现有记录而不是添加新记录
+                manager_data[i] = file_record
+                found_existing = True
+                print(f"发现已存在记录，更新: {relative_path}")
+                break
+        
+        # 如果没有找到现有记录，添加新记录
+        if not found_existing:
+            manager_data.append(file_record)
+            print(f"添加新记录: {relative_path}")
         
         # 保存更新后的manager数据
         with open(manager_path, 'w', encoding='utf-8') as f:
             json.dump(manager_data, f, ensure_ascii=False, indent=2)
         
+        action = "更新" if file_exists else "创建"
+        print(f"已{action} {manager_path} 文件")
         return True
     except Exception as e:
         print(f"更新markdown_manager.json时出错: {str(e)}")
