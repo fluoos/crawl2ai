@@ -304,15 +304,28 @@ def update_markdown_registry(original_path, markdown_path, title=None, is_conver
         else:
             print(f"注意: {manager_path} 不存在，将创建新文件")
         
-        # 添加新记录
-        manager_data.append(file_record)
+        # 检查文件是否已存在，避免重复
+        found_existing = False
+        for i, item in enumerate(manager_data):
+            if (isinstance(item, dict) and 
+                item.get('filePath') == relative_path):
+                # 更新现有记录而不是添加新记录
+                manager_data[i] = file_record
+                found_existing = True
+                print(f"发现已存在记录，更新: {relative_path}")
+                break
+        
+        # 如果没有找到现有记录，添加新记录
+        if not found_existing:
+            manager_data.append(file_record)
+            print(f"添加新记录: {relative_path}")
         
         # 保存更新后的manager数据
         with open(manager_path, 'w', encoding='utf-8') as f:
             json.dump(manager_data, f, ensure_ascii=False, indent=2)
         
         action = "更新" if file_exists else "创建"
-        print(f"已{action} {manager_path} 文件，添加记录: {relative_path}")
+        print(f"已{action} {manager_path} 文件")
         return True
     except Exception as e:
         print(f"更新markdown_manager.json时出错: {str(e)}")

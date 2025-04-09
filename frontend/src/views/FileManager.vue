@@ -180,7 +180,6 @@ const fetchFileList = async () => {
 // 文件上传成功处理
 const handleUploadSuccess = () => {
   fetchFileList();
-  message.success('文件上传成功');
 };
 
 // 表格选择变化
