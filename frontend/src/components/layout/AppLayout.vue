@@ -66,7 +66,7 @@ watch(() => route.path, (newPath) => {
   align-items: center;
   padding: 0 24px;
   position: fixed;
-  z-index: 1;
+  z-index: 100;
   width: 100%;
 }
 

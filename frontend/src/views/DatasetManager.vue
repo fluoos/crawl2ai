@@ -48,6 +48,13 @@
           <a-button @click="fetchQAList">
             <ReloadOutlined /> 刷新列表
           </a-button>
+          <a-button 
+            type="danger" 
+            :disabled="selectedRowKeys.length === 0"
+            @click="confirmBatchDelete"
+          >
+            <DeleteOutlined /> 批量删除
+          </a-button>
           <a-button type="primary" @click="showExportDialog">
             <ExportOutlined /> 导出数据集
           </a-button>
@@ -60,6 +67,7 @@
         :data-source="qaList"
         :pagination="pagination"
         :loading="tableLoading"
+        :row-selection="{ selectedRowKeys, onChange: onSelectChange }"
         row-key="id"
         @change="handleTableChange"
       >
@@ -73,6 +81,11 @@
           <template v-else-if="column.dataIndex === 'label'">
             <a-tag color="blue" v-if="text">{{ text }}</a-tag>
             <a-tag color="default" v-else>未标记</a-tag>
+          </template>
+          <template v-else-if="column.key === 'action'">
+            <a-button type="link" danger @click="confirmDelete(record)">
+              删除
+            </a-button>
           </template>
         </template>
       </a-table>
@@ -88,10 +101,10 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue';
-import { message } from 'ant-design-vue';
-import { DatabaseOutlined, CheckCircleOutlined, BarChartOutlined, ExportOutlined, ReloadOutlined } from '@ant-design/icons-vue';
+import { message, Modal } from 'ant-design-vue';
+import { DatabaseOutlined, CheckCircleOutlined, BarChartOutlined, ExportOutlined, ReloadOutlined, DeleteOutlined } from '@ant-design/icons-vue';
 import ExportDialog from '../components/business/ExportDialog.vue';
-import { getDataStats, previewData } from '../services/api';
+import { getDataStats, getDatasetList, deleteQAItems } from '../services/api';
 
 // 数据统计
 const stats = reactive({
@@ -104,6 +117,7 @@ const statsLoading = ref(false);
 // 表格数据
 const qaList = ref([]);
 const tableLoading = ref(false);
+const selectedRowKeys = ref([]);
 const pagination = reactive({
   current: 1,
   pageSize: 10,
@@ -137,6 +151,12 @@ const columns = [
     title: '标签',
     dataIndex: 'label',
     width: 120
+  },
+  {
+    title: '操作',
+    key: 'action',
+    width: 90,
+    fixed: 'right'
   }
 ];
 
@@ -168,7 +188,7 @@ const fetchStats = async () => {
 const fetchQAList = async () => {
   tableLoading.value = true;
   try {
-    const response = await previewData({
+    const response = await getDatasetList({
       format: 'jsonl',
       style: 'Custom',
       template: {
@@ -222,6 +242,77 @@ const handleExportSuccess = (response) => {
       window.open(response.downloadUrl, '_blank');
     }, 500);
   }
+};
+
+// 删除问答对
+const confirmDelete = (record) => {
+  Modal.confirm({
+    title: '确认删除',
+    content: `您确定要删除问题 "${record.question.substring(0, 30)}${record.question.length > 30 ? '...' : ''}" 及其答案吗？`,
+    okText: '确认',
+    okType: 'danger',
+    cancelText: '取消',
+    onOk: async () => {
+      try {
+        // 发送删除请求，注意这里要传实际索引（由于表格的ID是从1开始的，需要转换）
+        const realIndex = record.id - 1;
+        const response = await deleteQAItems([realIndex]);
+        
+        if (response && response.status === 'success') {
+          message.success(response.message || '删除成功');
+          // 刷新数据和统计
+          fetchQAList();
+          fetchStats();
+        } else {
+          message.error('删除失败');
+        }
+      } catch (error) {
+        console.error('删除问答对失败:', error);
+        message.error('删除失败: ' + (error.message || '未知错误'));
+      }
+    }
+  });
+};
+
+// 批量删除
+const confirmBatchDelete = () => {
+  if (selectedRowKeys.value.length === 0) {
+    return;
+  }
+  
+  Modal.confirm({
+    title: '批量删除',
+    content: `您确定要删除选中的 ${selectedRowKeys.value.length} 个问答对吗？`,
+    okText: '确认',
+    okType: 'danger',
+    cancelText: '取消',
+    onOk: async () => {
+      try {
+        // 获取真实索引（页面ID从1开始，后端从0开始）
+        const realIndices = selectedRowKeys.value.map(id => id - 1);
+        const response = await deleteQAItems(realIndices);
+        
+        if (response && response.status === 'success') {
+          message.success(response.message || '批量删除成功');
+          // 清空选择
+          selectedRowKeys.value = [];
+          // 刷新数据和统计
+          fetchQAList();
+          fetchStats();
+        } else {
+          message.error('批量删除失败');
+        }
+      } catch (error) {
+        console.error('批量删除问答对失败:', error);
+        message.error('批量删除失败: ' + (error.message || '未知错误'));
+      }
+    }
+  });
+};
+
+// 行选择变化处理
+const onSelectChange = (keys) => {
+  selectedRowKeys.value = keys;
 };
 </script>
 

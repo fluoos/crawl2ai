@@ -1,11 +1,14 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends, Query
 from fastapi.responses import FileResponse, JSONResponse
 import os
 import json
-from typing import Dict, Any
+from typing import Dict, Any, List
 from datetime import datetime
+import logging
+import shutil
 
-from app.core.config import settings
+from app.schemas.dataset import DeleteItemsRequest
+from app.api.deps import get_api_key
 
 router = APIRouter()
 
@@ -242,6 +245,69 @@ async def download_file(style: str, filename: str):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/delete", response_model=Dict[str, Any])
+async def delete_items(
+    request: DeleteItemsRequest,
+    api_key: str = Depends(get_api_key)
+):
+    """删除指定的问答对"""
+    if not request.ids:
+        raise HTTPException(status_code=400, detail="请提供要删除的问答对ID")
+    
+    dataset_path = os.path.join("output", "qa_dataset.jsonl")
+    
+    if not os.path.exists(dataset_path):
+        raise HTTPException(status_code=404, detail="数据集文件不存在")
+    
+    # 读取现有数据集
+    items = []
+    try:
+        with open(dataset_path, "r", encoding="utf-8") as f:
+            for line in f:
+                if line.strip():
+                    items.append(json.loads(line))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"读取数据集文件失败: {str(e)}")
+    
+    # 检查ID是否有效
+    max_id = len(items) - 1
+    invalid_ids = [id for id in request.ids if id < 0 or id > max_id]
+    if invalid_ids:
+        raise HTTPException(status_code=400, detail=f"无效的ID: {invalid_ids}，有效范围: 0-{max_id}")
+    
+    # 备份原始文件
+    backup_path = os.path.join("output", f"qa_dataset.jsonl.bak.{datetime.now().strftime('%Y%m%d%H%M%S')}")
+    try:
+        shutil.copy2(dataset_path, backup_path)
+    except Exception as e:
+        logging.warning(f"备份原始文件失败: {str(e)}")
+    
+    # 删除指定ID的项
+    to_delete = set(request.ids)
+    remaining_items = []
+    deleted_count = 0
+    
+    for i, item in enumerate(items):
+        if i in to_delete:
+            deleted_count += 1
+        else:
+            remaining_items.append(item)
+    
+    # 将剩余项写回文件
+    try:
+        with open(dataset_path, "w", encoding="utf-8") as f:
+            for item in remaining_items:
+                f.write(json.dumps(item, ensure_ascii=False) + "\n")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"写入更新后的数据集失败: {str(e)}")
+    
+    return {
+        "status": "success",
+        "message": f"成功删除 {deleted_count} 个问答对，剩余 {len(remaining_items)} 个",
+        "deleted_count": deleted_count,
+        "remaining_count": len(remaining_items)
+    }
 
 # 辅助函数
 def read_jsonl_file(file_path):

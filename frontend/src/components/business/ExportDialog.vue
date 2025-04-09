@@ -76,7 +76,7 @@
 <script setup>
 import { ref, reactive } from 'vue';
 import { message } from 'ant-design-vue';
-import { previewData as fetchPreviewData, exportData } from '../../services/api';
+import { getDatasetList, exportDataset } from '../../services/api';
 
 const props = defineProps({
   visible: {
@@ -106,7 +106,7 @@ const previewData = ref([]);
 const handlePreview = async () => {
   previewLoading.value = true;
   try {
-    const response = await fetchPreviewData({
+    const response = await getDatasetList({
       format: formState.format,
       style: formState.style,
       inputFile: formState.inputFile,
@@ -136,7 +136,7 @@ const handleOk = async () => {
   
   loading.value = true;
   try {
-    const response = await exportData({
+    const response = await exportDataset({
       format: formState.format,
       style: formState.style,
       inputFile: formState.inputFile,

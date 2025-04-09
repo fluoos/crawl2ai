@@ -1,9 +1,16 @@
 import request from './request';
 
+// 数据集管理-导出数据
+export const exportDataset = (options) => {
+  return request({
+    url: '/api/dataset/export',
+    method: 'post',
+    data: options
+  });
+};
+
 // 数据集管理-数据列表
-export const previewData = (params) => {
-  console.log('预览数据请求参数:', params);
-  
+export const getDatasetList = (params) => {
   return request({
     url: '/api/dataset/list',
     method: 'post',
@@ -11,12 +18,12 @@ export const previewData = (params) => {
   });
 };
 
-// 数据集管理-导出数据
-export const exportData = (options) => {
+// 数据集管理-删除问答对
+export const deleteQAItems = (ids) => {
   return request({
-    url: '/api/dataset/export',
+    url: '/api/dataset/delete',
     method: 'post',
-    data: options
+    data: { ids }
   });
 };
 
