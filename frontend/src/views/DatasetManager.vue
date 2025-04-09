@@ -148,7 +148,7 @@ const columns = [
     ellipsis: true
   },
   {
-    title: '标签',
+    title: '领域标签',
     dataIndex: 'label',
     width: 120
   },
