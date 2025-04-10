@@ -47,7 +47,6 @@ A large model dataset generation and fine-tuning tool that can crawl links from 
 │   └── main.py             # Main program entry
 ├── frontend/               # Frontend directory
 │   ├── src/                # Source code
-│   │   ├── api/            # API calls
 │   │   ├── assets/         # Static resources
 │   │   ├── components/     # Components directory
 │   │   │   ├── business/   # Business components

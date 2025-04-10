@@ -39,7 +39,6 @@
 │   └── main.py             # 主程序入口
 ├── frontend/               # 前端目录
 │   ├── src/                # 源代码
-│   │   ├── api/            # API调用
 │   │   ├── assets/         # 静态资源
 │   │   ├── components/     # 组件目录
 │   │   │   ├── business/   # 业务组件
