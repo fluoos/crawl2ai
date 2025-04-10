@@ -219,7 +219,7 @@ async def export_data(options: Dict[str, Any]):
             "message": "导出成功",
             "filename": output_file,
             "path": output_path,
-            "downloadUrl": f"/api/download/{style.lower()}/{output_file}"
+            "downloadUrl": f"/api/dataset/download/{style.lower()}/{output_file}"
         }
         
     except HTTPException:
@@ -239,7 +239,8 @@ async def download_file(style: str, filename: str):
         return FileResponse(
             path=file_path,
             filename=filename,
-            media_type="application/octet-stream"
+            media_type="application/octet-stream",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
         )
     except HTTPException:
         raise

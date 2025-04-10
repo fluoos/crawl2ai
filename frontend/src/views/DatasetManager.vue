@@ -105,6 +105,8 @@ import { message, Modal } from 'ant-design-vue';
 import { DatabaseOutlined, CheckCircleOutlined, BarChartOutlined, ExportOutlined, ReloadOutlined, DeleteOutlined } from '@ant-design/icons-vue';
 import ExportDialog from '../components/business/ExportDialog.vue';
 import { getDataStats, getDatasetList, deleteQAItems } from '../services/dataset';
+import { getFullApiUrl } from '../utils/url';
+import { downloadFile } from '../utils/download';
 
 // 数据统计
 const stats = reactive({
@@ -239,7 +241,7 @@ const handleExportSuccess = (response) => {
   if (response && response.downloadUrl) {
     message.success('导出成功');
     setTimeout(() => {
-      window.open(response.downloadUrl, '_blank');
+      downloadFile(response.downloadUrl, response.filename);
     }, 500);
   }
 };

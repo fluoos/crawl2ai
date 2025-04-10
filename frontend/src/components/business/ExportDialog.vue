@@ -77,6 +77,7 @@
 import { ref, reactive } from 'vue';
 import { message } from 'ant-design-vue';
 import { getDatasetList, exportDataset } from '../../services/dataset';
+import { processApiDownloadUrl } from '../../utils/url';
 
 const props = defineProps({
   visible: {
@@ -144,8 +145,9 @@ const handleOk = async () => {
       template: formState.style === 'Custom' ? formState.template : undefined
     });
     
-    message.success('导出成功');
-    emit('export-success', response);
+    // 处理下载URL
+    const processedResponse = processApiDownloadUrl(response);
+    emit('export-success', processedResponse);
     emit('update:visible', false);
   } catch (error) {
     message.error('导出失败');
