@@ -76,7 +76,7 @@
 <script setup>
 import { ref, reactive } from 'vue';
 import { message } from 'ant-design-vue';
-import { getDatasetList, exportDataset } from '../../services/api';
+import { getDatasetList, exportDataset } from '../../services/dataset';
 
 const props = defineProps({
   visible: {

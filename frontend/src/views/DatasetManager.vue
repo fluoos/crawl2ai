@@ -104,7 +104,7 @@ import { ref, reactive, onMounted } from 'vue';
 import { message, Modal } from 'ant-design-vue';
 import { DatabaseOutlined, CheckCircleOutlined, BarChartOutlined, ExportOutlined, ReloadOutlined, DeleteOutlined } from '@ant-design/icons-vue';
 import ExportDialog from '../components/business/ExportDialog.vue';
-import { getDataStats, getDatasetList, deleteQAItems } from '../services/api';
+import { getDataStats, getDatasetList, deleteQAItems } from '../services/dataset';
 
 // 数据统计
 const stats = reactive({
