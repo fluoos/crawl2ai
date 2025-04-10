@@ -36,11 +36,12 @@ class Settings(BaseSettings):
     # 前端环境变量 - 可以保留但非必需
     VITE_API_BASE_URL: str = "http://localhost:8000"
     
-    # 使用旧版配置
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
-        extra = "ignore"  # 添加此行以忽略额外字段
+    # 使用Pydantic v2配置语法
+    model_config = {
+        "env_file": ".env",
+        "case_sensitive": True,
+        "extra": "ignore"  # 忽略额外字段
+    }
 
 # 生成设置实例
 settings = Settings()
