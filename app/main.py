@@ -30,7 +30,7 @@ app.add_middleware(
 
 # 注册路由
 app.include_router(common.router, prefix="/api", tags=["通用"])
-app.include_router(crawler.router, prefix="/api/crawler", tags=["链接爬虫"])
+app.include_router(crawler.router, prefix="/api/crawler", tags=["链接管理"])
 app.include_router(files.router, prefix="/api/files", tags=["文件管理"])
 app.include_router(converter.router, prefix="/api/converter", tags=["文件转换"])
 app.include_router(dataset.router, prefix="/api/dataset", tags=["数据集管理"])

@@ -4,7 +4,7 @@ import os
 from typing import Dict, Any, List, Optional
 
 from app.core.config import settings
-from app.api.deps import get_api_key
+from app.core.deps import get_api_key
 from app.schemas.dataset import DeleteItemsRequest, DatasetListRequest, DatasetExportRequest
 from app.services.dataset_service import DatasetService, EXPORT_FORMATS, DATASET_STYLES, INPUT_FILE
 

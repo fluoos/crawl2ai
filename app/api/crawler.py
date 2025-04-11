@@ -11,7 +11,7 @@ from pathlib import Path
 from datetime import datetime
 
 from app.schemas.crawler import CrawlerRequest, CrawlerResponse, UrlToMarkdownRequest, UrlToMarkdownResponse
-from app.api.deps import get_api_key
+from app.core.deps import get_api_key
 
 # 导入crawl4ai库
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, BrowserConfig, MemoryAdaptiveDispatcher, CrawlerMonitor, DisplayMode

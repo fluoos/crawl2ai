@@ -45,7 +45,7 @@
     <a-card title="数据集问答对" class="card-wrapper">
       <template #extra>
         <a-space>
-          <a-button @click="fetchQAList">
+          <a-button @click="fetchStatsAndQAList">
             <ReloadOutlined /> 刷新列表
           </a-button>
           <a-button 
@@ -164,9 +164,13 @@ const columns = [
 
 // 初始化
 onMounted(() => {
+  fetchStatsAndQAList()
+});
+
+const fetchStatsAndQAList = () => {
   fetchStats();
   fetchQAList();
-});
+};
 
 // 获取数据统计
 const fetchStats = async () => {

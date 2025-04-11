@@ -9,7 +9,7 @@ from app.core.config import settings
 from pydantic import BaseModel
 
 from app.schemas.converter import ConversionRequest, ConversionResponse
-from app.api.deps import get_api_key
+from app.core.deps import get_api_key
 
 router = APIRouter()
 
