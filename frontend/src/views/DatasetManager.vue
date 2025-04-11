@@ -45,7 +45,7 @@
     <a-card title="数据集问答对" class="card-wrapper">
       <template #extra>
         <a-space>
-          <a-button @click="fetchQAList">
+          <a-button @click="fetchStatsAndQAList">
             <ReloadOutlined /> 刷新列表
           </a-button>
           <a-button 
@@ -104,7 +104,9 @@ import { ref, reactive, onMounted } from 'vue';
 import { message, Modal } from 'ant-design-vue';
 import { DatabaseOutlined, CheckCircleOutlined, BarChartOutlined, ExportOutlined, ReloadOutlined, DeleteOutlined } from '@ant-design/icons-vue';
 import ExportDialog from '../components/business/ExportDialog.vue';
-import { getDataStats, getDatasetList, deleteQAItems } from '../services/api';
+import { getDataStats, getDatasetList, deleteQAItems } from '../services/dataset';
+import { getFullApiUrl } from '../utils/url';
+import { downloadFile } from '../utils/download';
 
 // 数据统计
 const stats = reactive({
@@ -162,9 +164,13 @@ const columns = [
 
 // 初始化
 onMounted(() => {
+  fetchStatsAndQAList()
+});
+
+const fetchStatsAndQAList = () => {
   fetchStats();
   fetchQAList();
-});
+};
 
 // 获取数据统计
 const fetchStats = async () => {
@@ -239,7 +245,7 @@ const handleExportSuccess = (response) => {
   if (response && response.downloadUrl) {
     message.success('导出成功');
     setTimeout(() => {
-      window.open(response.downloadUrl, '_blank');
+      downloadFile(response.downloadUrl, response.filename);
     }, 500);
   }
 };

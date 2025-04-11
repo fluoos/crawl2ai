@@ -147,7 +147,7 @@
 import { ref, reactive, onMounted } from 'vue';
 import { message, Modal } from 'ant-design-vue';
 import { ReloadOutlined } from '@ant-design/icons-vue';
-import { crawlLinks, getCrawlStatus, convertToMarkdown, stopCrawl, deleteUrls } from '../services/api';
+import { crawlLinks, getCrawlStatus, convertToMarkdown, stopCrawl, deleteUrls } from '../services/crawler';
 
 // 表单状态
 const formState = reactive({
