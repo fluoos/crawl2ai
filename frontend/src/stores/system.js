@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { getSystemConfig, updateSystemConfig } from '../services/config';
+import { getSystemConfig, updateSystemConfig } from '../services/system';
 
 export const useSystemStore = defineStore('system', {
   state: () => ({
