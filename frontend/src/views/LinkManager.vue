@@ -106,7 +106,7 @@
           <a-button
             type="primary"
             :disabled="!selectedUrls.length"
-            @click="handleConvert"
+            @click="showConvertModal"
             :loading="convertLoading"
           >
             转换为Markdown
@@ -140,6 +140,40 @@
         </template>
       </a-table>
     </a-card>
+    
+    <!-- 添加转换配置的弹窗 -->
+    <a-modal
+      v-model:visible="convertModalVisible"
+      title="转换设置"
+      @ok="handleConvertConfirm"
+      okText="开始转换"
+      cancelText="取消"
+      :confirmLoading="convertLoading"
+    >
+      <a-form layout="vertical">
+        <a-form-item label="包含选择器（可选）" name="includedSelector">
+          <a-input 
+            v-model:value="convertOptions.includedSelector" 
+            placeholder="例如: .article-content, #main-content"
+          />
+          <div class="form-item-hint">CSS选择器，用于指定要包含的HTML元素</div>
+        </a-form-item>
+        <a-form-item label="排除选择器（可选）" name="excludedSelector">
+          <a-input 
+            v-model:value="convertOptions.excludedSelector" 
+            placeholder="例如: .ads, .sidebar, .navigation"
+          />
+          <div class="form-item-hint">CSS选择器，用于指定要排除的HTML元素</div>
+        </a-form-item>
+        <a-form-item label="输出目录" name="outputDir">
+          <a-input 
+            v-model:value="convertOptions.outputDir" 
+            disabled
+            placeholder="输出目录路径"
+          />
+        </a-form-item>
+      </a-form>
+    </a-modal>
   </div>
 </template>
 
@@ -159,6 +193,18 @@ const formState = reactive({
   crawlStrategy: 'bfs',
   forceRefresh: false
 });
+
+// 转换选项状态
+const convertOptions = reactive({
+  includedSelector: '',
+  excludedSelector: '',
+  outputDir: 'output/markdown'
+});
+
+// 转换弹窗状态
+const convertModalVisible = ref(false);
+// 当前选中的URL列表（用于转换）
+const urlsToConvert = ref([]);
 
 // 爬取状态
 const crawlLoading = ref(false);
@@ -374,32 +420,37 @@ const handleTableChange = (pag) => {
   pagination.pageSize = pag.pageSize;
 };
 
-// 转换单个URL
-const handleSingleConvert = async (record) => {
-  await handleConvertUrls([record.url]);
+// 显示转换配置弹窗 - 单个URL
+const handleSingleConvert = (record) => {
+  urlsToConvert.value = [record.url];
+  convertModalVisible.value = true;
 };
 
-// 转换选中的URLs
-const handleConvert = async () => {
+// 显示转换配置弹窗 - 多个URL
+const showConvertModal = () => {
   if (selectedUrls.value.length === 0) {
     message.warning('请先选择要转换的URL');
     return;
   }
   
-  await handleConvertUrls(selectedUrls.value);
+  urlsToConvert.value = selectedUrls.value;
+  convertModalVisible.value = true;
 };
 
-// 转换URLs
-const handleConvertUrls = async (urls) => {
+// 确认转换
+const handleConvertConfirm = async () => {
   convertLoading.value = true;
   try {
     const response = await convertToMarkdown({
-      urls: urls,
-      output_dir: "output/markdown"
+      urls: urlsToConvert.value,
+      output_dir: convertOptions.outputDir,
+      included_selector: convertOptions.includedSelector || null,
+      excluded_selector: convertOptions.excludedSelector || null
     });
     
     if (response.status === 'success') {
       message.success('转换任务已提交，请在文件管理中查看结果');
+      convertModalVisible.value = false;
     } else {
       message.error(response.message || '转换失败');
     }

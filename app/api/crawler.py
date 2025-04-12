@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends
-from typing import List
+from typing import List, Optional
 
 from app.schemas.crawler import CrawlerRequest, CrawlerResponse, UrlToMarkdownRequest, UrlToMarkdownResponse
 from app.core.deps import get_api_key
@@ -63,6 +63,11 @@ async def convert_to_markdown(
     """将URL列表转换为Markdown文件"""
     urls = [str(url) for url in request.urls]
     try:
-        return CrawlerService.start_convert_process(urls, request.output_dir)
+        return CrawlerService.start_convert_process(
+            urls=urls, 
+            output_dir=request.output_dir,
+            included_selector=request.included_selector,
+            excluded_selector=request.excluded_selector
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"转换任务创建失败: {str(e)}")

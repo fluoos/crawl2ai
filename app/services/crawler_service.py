@@ -248,7 +248,12 @@ class CrawlerService:
             raise
 
     @staticmethod
-    def start_convert_process(urls: List[str], output_dir: str = "output/markdown") -> Dict[str, Any]:
+    def start_convert_process(
+        urls: List[str], 
+        output_dir: str = "output/markdown",
+        included_selector: Optional[str] = None,
+        excluded_selector: Optional[str] = None
+    ) -> Dict[str, Any]:
         """启动URL转换为Markdown的进程"""
         if not urls:
             print("没有需要转换的URL")
@@ -263,7 +268,9 @@ class CrawlerService:
                 target=CrawlerService.convert_urls_to_markdown_process,
                 args=(
                     urls,
-                    output_dir
+                    output_dir,
+                    included_selector,
+                    excluded_selector
                 )
             )
             process.daemon = True
@@ -309,7 +316,12 @@ class CrawlerService:
             print(f"爬虫任务失败: {str(e)}")
 
     @staticmethod
-    def convert_urls_to_markdown_process(urls, output_dir="output/markdown"):
+    def convert_urls_to_markdown_process(
+        urls, 
+        output_dir="output/markdown",
+        included_selector=None,
+        excluded_selector=None
+    ):
         """在独立进程中运行URL到Markdown的转换任务"""
         # 记录转换任务开始
         os.makedirs("output", exist_ok=True)
@@ -320,7 +332,9 @@ class CrawlerService:
             # 在新进程中运行异步函数，使用asyncio.run是安全的
             asyncio.run(CrawlerService.convert_urls_to_markdown(
                 urls=urls,
-                output_dir=output_dir
+                output_dir=output_dir,
+                included_selector=included_selector,
+                excluded_selector=excluded_selector
             ))
             
             # 更新状态为已完成
@@ -490,7 +504,9 @@ class CrawlerService:
     @staticmethod
     async def convert_urls_to_markdown(
         urls: List[str],
-        output_dir: str = "output/markdown"
+        output_dir: str = "output/markdown",
+        included_selector: Optional[str] = None,
+        excluded_selector: Optional[str] = None
     ) -> List[str]:
         """将URL列表转换为Markdown文件"""
         os.makedirs(output_dir, exist_ok=True)
@@ -498,7 +514,9 @@ class CrawlerService:
         print(f"读取到 {len(urls)} 个需要转换的新URL")
         
         browser_config = BrowserConfig(verbose=True)
-        run_config = CrawlerRunConfig(
+        
+        # 配置爬虫
+        run_config_dict = {
             # markdown_generator=DefaultMarkdownGenerator(),
             # Content filtering
             # word_count_threshold=10,
@@ -510,12 +528,20 @@ class CrawlerService:
             # remove_overlay_elements=True,
             # css_selector="#article-wrap, .article-title, .article-container",
             # css_selector=".article-title, #article-container-warp",
-            excluded_selector=".article-pagination",
+            # excluded_selector=".article-pagination",
             # target_elements=["#article-wrap"], // 无效
             # Cache control
             # cache_mode=CacheMode.ENABLED,  # Use cache if available
-            stream=True
-        )
+            "stream": True
+        }
+        
+        # 添加选择器配置
+        if included_selector:
+            run_config_dict["css_selector"] = included_selector
+        if excluded_selector:
+            run_config_dict["excluded_selector"] = excluded_selector
+            
+        run_config = CrawlerRunConfig(**run_config_dict)
 
         async with AsyncWebCrawler(config=browser_config) as crawler:
             # 该逻辑不能修改，stream=True模式要使用async for result in await
