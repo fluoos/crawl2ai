@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import os
 
-from app.api import crawler, files, converter, common, system, dataset
+from app.api import crawler, files, system, dataset
 
 # 确保必要的目录存在
 for dir_path in ["output", "upload", "export", "config"]:
@@ -29,10 +29,8 @@ app.add_middleware(
 )
 
 # 注册路由
-app.include_router(common.router, prefix="/api", tags=["通用"])
 app.include_router(crawler.router, prefix="/api/crawler", tags=["链接管理"])
 app.include_router(files.router, prefix="/api/files", tags=["文件管理"])
-app.include_router(converter.router, prefix="/api/converter", tags=["文件转换"])
 app.include_router(dataset.router, prefix="/api/dataset", tags=["数据集管理"])
 app.include_router(system.router, prefix="/api/system", tags=["系统配置"])
 

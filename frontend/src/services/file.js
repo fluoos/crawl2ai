@@ -9,7 +9,7 @@ import request from './request';
  */
 export const convertToDataset = (files, model, outputFile) => {
   return request({
-    url: '/api/converter/convert',
+    url: '/api/dataset/convert',
     method: 'post',
     data: {
       files,
