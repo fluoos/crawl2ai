@@ -60,14 +60,19 @@ export const getCrawlStatus = () => {
 };
 
 /**
- * 将URL转换为Markdown文件
- * @param {Object} params 转换参数
- * @returns {Promise}
+ * 将URL列表转换为Markdown
+ * @param {Object} data 
+ * @param {Array<string>} data.urls URL列表
+ * @param {string} data.output_dir 输出目录
+ * @param {string} data.included_selector 包含选择器（可选）
+ * @param {string} data.excluded_selector 排除选择器（可选）
+ * @returns {Promise<Object>}
  */
-export const convertToMarkdown = (params) => {
-  return request({
-    url: '/api/crawler/convert',
-    method: 'post',
-    data: params
-  });
-}; 
+export async function convertToMarkdown(data) {
+  try {
+    return await request.post('/api/crawler/convert', data);
+  } catch (error) {
+    console.error('转换为Markdown失败:', error);
+    throw error;
+  }
+} 

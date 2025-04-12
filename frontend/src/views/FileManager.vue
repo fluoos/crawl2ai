@@ -96,7 +96,7 @@ import { message, Modal } from 'ant-design-vue';
 import { ReloadOutlined } from '@ant-design/icons-vue';
 import DataTable from '../components/common/DataTable.vue';
 import FileUploader from '../components/common/FileUploader.vue';
-import { getFileList, convertToDataset, getFilePreview, deleteFiles } from '../services/file';
+import { getFileList, convertToDataset, getFilePreview, deleteFiles } from '../services/files';
 
 // 表格数据
 const fileList = ref([]);

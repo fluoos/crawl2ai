@@ -25,6 +25,8 @@ class CrawlerResponse(BaseModel):
 class UrlToMarkdownRequest(BaseModel):
     urls: List[str]
     output_dir: Optional[str] = "output"
+    included_selector: Optional[str] = None
+    excluded_selector: Optional[str] = None
     
 class UrlToMarkdownResponse(BaseModel):
     status: str

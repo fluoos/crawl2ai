@@ -39,7 +39,7 @@
 import { ref } from 'vue';
 import { message } from 'ant-design-vue';
 import { InboxOutlined } from '@ant-design/icons-vue';
-import { uploadFile } from '../../services/file';
+import { uploadFile } from '../../services/files';
 
 const props = defineProps({
   accept: {

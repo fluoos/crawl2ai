@@ -142,7 +142,7 @@ const columns = [
     title: '问题',
     dataIndex: 'question',
     ellipsis: true,
-    width: '40%'
+    width: '32%'
   },
   {
     title: '答案',
@@ -152,7 +152,7 @@ const columns = [
   {
     title: '领域标签',
     dataIndex: 'label',
-    width: 120
+    width: 140
   },
   {
     title: '操作',
