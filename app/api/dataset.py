@@ -128,13 +128,14 @@ async def convert_to_dataset(
     try:
         # 启动转换任务
         result = DatasetService.save_conversion_task_status(files, model, output_file)
-        
-        # 在后台执行转换任务
+        api_key = None
+        # 在后台执行转换任务，传入 api_key
         background_tasks.add_task(
             DatasetService.convert_files_to_dataset_task, 
             files, 
             model, 
-            output_file
+            output_file,
+            api_key
         )
         
         return result
