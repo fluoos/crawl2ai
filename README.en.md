@@ -21,6 +21,46 @@ A tool for large model dataset generation and fine-tuning, enabling one-click cr
 - Support for previewing conversion results
 - Future support for direct fine-tuning of large models
 
+## Quick Start
+
+### Install Dependencies
+
+1. Backend dependencies:
+
+```bash
+# Recommended Python version is python=3.10
+# Create virtual environment
+python -m venv venv
+# Activate environment (in PowerShell)
+.\venv\Scripts\Activate.ps1
+# Install all dependencies from requirements.txt
+pip install -r requirements.txt
+```
+
+2. Frontend dependencies:
+
+```bash
+cd frontend
+npm install
+```
+
+### Run the Project
+
+1. Start the backend server:
+
+```bash
+uvicorn app.main:app --reload
+```
+
+2. Start the frontend development server:
+
+```bash
+cd frontend
+npm run dev
+```
+
+3. Access in browser: `http://localhost:3000`
+
 ## Project Structure
 
 ```
@@ -82,46 +122,6 @@ A tool for large model dataset generation and fine-tuning, enabling one-click cr
 ├── README.zh-CN.md         # Chinese documentation
 └── requirements.txt        # Python dependencies file
 ```
-
-## Quick Start
-
-### Install Dependencies
-
-1. Backend dependencies:
-
-```bash
-# Recommended Python version is python=3.10
-# Create virtual environment
-python -m venv venv
-# Activate environment (in PowerShell)
-.\venv\Scripts\Activate.ps1
-# Install all dependencies from requirements.txt
-pip install -r requirements.txt
-```
-
-2. Frontend dependencies:
-
-```bash
-cd frontend
-npm install
-```
-
-### Run the Project
-
-1. Start the backend server:
-
-```bash
-uvicorn app.main:app --reload
-```
-
-2. Start the frontend development server:
-
-```bash
-cd frontend
-npm run dev
-```
-
-3. Access in browser: `http://localhost:3000`
 
 ## Input Data Format
 

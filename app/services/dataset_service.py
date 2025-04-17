@@ -298,11 +298,11 @@ class DatasetService:
         return {"status": "success", "message": "转换任务已开始"}
     
     @staticmethod
-    async def convert_files_to_dataset_task(files: List[str], model: str, output_file: str):
+    async def convert_files_to_dataset_task(files: List[str], model: str, output_file: str, api_key: str = None):
         """转换文件到数据集的后台任务"""
         print(f"正在转换 {len(files)} 个文件")
         try:
-            await DatasetService.convert_files_to_dataset(files, model, output_file)
+            await DatasetService.convert_files_to_dataset(files, model, output_file, api_key)
             conversion_state[output_file]["status"] = "completed"
             conversion_state[output_file]["message"] = "转换任务已完成"
             conversion_state[output_file]["progress"] = conversion_state[output_file]["total"]
@@ -315,7 +315,8 @@ class DatasetService:
     async def convert_files_to_dataset(
         files: List[str],
         model: str = "deepseek",
-        output_file: str = "qa_dataset.jsonl"
+        output_file: str = "qa_dataset.jsonl",
+        api_key: str = None
     ) -> str:
         """将Markdown文件转换为问答数据集"""
         if not files:
@@ -328,7 +329,9 @@ class DatasetService:
         # 根据模型选择不同的API和提示词
         if model == "deepseek":
             api_url = "https://api.deepseek.com/v1/chat/completions"
-            api_key = settings.DEEPSEEK_API_KEY
+            # 如果没有提供api_key，则使用默认配置
+            if api_key is None:
+                api_key = settings.DEEPSEEK_API_KEY
             system_prompt = """
     Role: 微调数据集生成专家
     Description: 你是一名微调数据集生成专家，擅长从给定的内容中生成准确的问题答案，确保答案的准确性和相关性。请将用户提供的文本内容拆分成多个问答对, 并给每个问答对添加一个标签，每个问答对都应该是一个完整的知识点。
@@ -518,7 +521,6 @@ class DatasetService:
                                     if norm_proc_file.startswith('./'):
                                         norm_proc_file = norm_proc_file[2:]
                                         
-                                    print(f"比较: {norm_item_path} vs {norm_proc_file}")
                                     if norm_item_path == norm_proc_file:
                                         item['isDataset'] = True
                                         updated = True

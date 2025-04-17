@@ -21,6 +21,47 @@
 - 支持预览转换结果
 - 未来支持直接微调大模型
 
+
+## 快速开始
+
+### 安装依赖
+
+1. 后端依赖：
+
+```bash
+# 建议运行python的版本python=3.10
+# 创建虚拟环境
+python -m venv venv
+# 激活环境（在PowerShell中）
+.\venv\Scripts\Activate.ps1
+# 从requirements.txt安装所有依赖
+pip install -r requirements.txt
+```
+
+2. 前端依赖：
+
+```bash
+cd frontend
+npm install
+```
+
+### 运行项目
+
+1. 启动后端服务器：
+
+```bash
+uvicorn app.main:app --reload
+```
+
+2. 启动前端开发服务器：
+
+```bash
+cd frontend
+npm run dev
+```
+
+3. 在浏览器中访问：`http://localhost:3000`
+
 ## 项目结构
 
 ```
@@ -82,46 +123,6 @@
 ├── README.zh-CN.md         # 中文说明文档
 └── requirements.txt        # Python依赖文件
 ```
-
-## 快速开始
-
-### 安装依赖
-
-1. 后端依赖：
-
-```bash
-# 建议运行python的版本python=3.10
-# 创建虚拟环境
-python -m venv venv
-# 激活环境（在PowerShell中）
-.\venv\Scripts\Activate.ps1
-# 从requirements.txt安装所有依赖
-pip install -r requirements.txt
-```
-
-2. 前端依赖：
-
-```bash
-cd frontend
-npm install
-```
-
-### 运行项目
-
-1. 启动后端服务器：
-
-```bash
-uvicorn app.main:app --reload
-```
-
-2. 启动前端开发服务器：
-
-```bash
-cd frontend
-npm run dev
-```
-
-3. 在浏览器中访问：`http://localhost:3000`
 
 ## 输入数据格式
 
