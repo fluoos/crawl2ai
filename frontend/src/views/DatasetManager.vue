@@ -42,7 +42,14 @@
       </a-col>
     </a-row>
     
-    <a-card title="数据集问答对" class="card-wrapper">
+    <a-card  class="card-wrapper">
+      <template #title>
+        <a-space>
+          <a-button type="primary" @click="showAddDataDialog">
+            <PlusOutlined /> 新增数据
+          </a-button>
+        </a-space>
+      </template>
       <template #extra>
         <a-space>
           <a-button @click="fetchStatsAndQAList">
@@ -96,6 +103,11 @@
       v-model:visible="exportDialogVisible"
       @export-success="handleExportSuccess"
     />
+    <!-- 新增数据对话框 -->
+    <AddDataDialog
+      v-model:visible="addDataDialogVisible"
+      @add-success="handleAddSuccess"
+    />
   </div>
 </template>
 
@@ -104,8 +116,8 @@ import { ref, reactive, onMounted } from 'vue';
 import { message, Modal } from 'ant-design-vue';
 import { DatabaseOutlined, CheckCircleOutlined, BarChartOutlined, ExportOutlined, ReloadOutlined, DeleteOutlined } from '@ant-design/icons-vue';
 import ExportDialog from '../components/business/ExportDialog.vue';
+import AddDataDialog from '../components/business/AddDataDialog.vue';
 import { getDataStats, getDatasetList, deleteQAItems } from '../services/dataset';
-import { getFullApiUrl } from '../utils/url';
 import { downloadFile } from '../utils/download';
 
 // 数据统计
@@ -130,6 +142,8 @@ const pagination = reactive({
 
 // 导出对话框
 const exportDialogVisible = ref(false);
+// 新增数据对话框
+const addDataDialogVisible = ref(false);
 
 // 表格列定义
 const columns = [
@@ -239,6 +253,18 @@ const handleTableChange = (pag) => {
 const showExportDialog = () => {
   exportDialogVisible.value = true;
 };
+
+// 显示新增数据对话框
+const showAddDataDialog = () => {
+  addDataDialogVisible.value = true;
+};
+
+// 新增数据成功处理
+const handleAddSuccess = () => {
+  // 刷新数据和统计
+  fetchStatsAndQAList();
+};
+
 
 // 导出成功处理
 const handleExportSuccess = (response) => {
