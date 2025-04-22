@@ -142,6 +142,9 @@ class DatasetService:
             converted_data = DatasetService.convert_to_sharegpt_format(data)
         elif style == "Custom":
             converted_data = DatasetService.convert_to_custom_format(data, template)
+            
+        # 将数据倒序排列
+        converted_data.reverse()
         
         # 计算分页
         total = len(converted_data)

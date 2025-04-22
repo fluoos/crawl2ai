@@ -119,6 +119,7 @@ async def add_qa_item(
     api_key: str = Depends(get_api_key)
 ):
     """添加问答对到数据集"""
+    print(f"添加问答对: {params}")
     try:
         return DatasetService.add_qa_item(
             question=params.question,
@@ -131,6 +132,7 @@ async def add_qa_item(
     except Exception as e:
         print(f"添加问答对失败: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.post("/convert")
 async def convert_to_dataset(
