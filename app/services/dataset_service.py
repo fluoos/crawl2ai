@@ -603,9 +603,9 @@ class DatasetService:
         for item in data:
             if "question" in item and "answer" in item:
                 conversation = {
-                    "conversations": [
+                    "messages": [
                         {
-                            "role": "human",
+                            "role": "user",
                             "content": item["question"]
                         },
                         {
