@@ -142,6 +142,9 @@ class DatasetService:
             converted_data = DatasetService.convert_to_sharegpt_format(data)
         elif style == "Custom":
             converted_data = DatasetService.convert_to_custom_format(data, template)
+            
+        # 将数据倒序排列
+        converted_data.reverse()
         
         # 计算分页
         total = len(converted_data)
@@ -557,6 +560,63 @@ class DatasetService:
             "total": 0
         }
     
+    @staticmethod
+    def add_qa_item(
+        question: str,
+        answer: str,
+        chain_of_thought: Optional[str] = None,
+        label: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        向数据集中添加一个新的问答对
+        
+        参数:
+        - question: 问题内容
+        - answer: 答案内容
+        - chain_of_thought: 思考链，可选
+        - label: 分类标签，可选
+        
+        返回:
+        - Dict[str, Any]: 包含操作状态信息的字典
+        """
+        if not question or not answer:
+            raise ValueError("问题和答案不能为空")
+        
+        # 构建问答对数据
+        qa_item = {
+            "question": question,
+            "answer": answer
+        }
+        
+        # 添加可选字段
+        if chain_of_thought:
+            qa_item["chainOfThought"] = chain_of_thought
+            
+        if label:
+            qa_item["label"] = label
+            
+        # 确保输出目录存在
+        os.makedirs(settings.OUTPUT_DIR, exist_ok=True)
+        
+        # 写入数据
+        dataset_path = os.path.join(settings.OUTPUT_DIR, "qa_dataset.jsonl")
+        try:
+            with open(dataset_path, "a", encoding="utf-8") as f:
+                f.write(json.dumps(qa_item, ensure_ascii=False) + "\n")
+            
+            # 获取更新后的统计信息
+            stats = DatasetService.get_stats()
+            
+            return {
+                "status": "success",
+                "message": "问答对添加成功",
+                "qa_item": qa_item,
+                "stats": stats
+            }
+        except Exception as e:
+            logging.error(f"添加问答对失败: {str(e)}")
+            raise ValueError(f"添加问答对失败: {str(e)}")
+    
     # 辅助方法
     
     @staticmethod
@@ -603,9 +663,9 @@ class DatasetService:
         for item in data:
             if "question" in item and "answer" in item:
                 conversation = {
-                    "conversations": [
+                    "messages": [
                         {
-                            "role": "human",
+                            "role": "user",
                             "content": item["question"]
                         },
                         {
