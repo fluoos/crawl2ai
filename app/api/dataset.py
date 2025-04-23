@@ -51,10 +51,7 @@ async def list_data(
     """预览数据转换结果"""
     try:
         return DatasetService.list_data(
-            format_type=params.format,
-            style=params.style,
             input_file=params.inputFile,
-            template=params.template,
             page=params.page,
             page_size=params.pageSize
         )

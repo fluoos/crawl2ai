@@ -209,13 +209,6 @@ const fetchQAList = async () => {
   tableLoading.value = true;
   try {
     const response = await getDatasetList({
-      format: 'jsonl',
-      style: 'Custom',
-      template: {
-        query: { field: 'question' },
-        response: { field: 'answer' },
-        category: { field: 'label' }
-      },
       page: pagination.current,
       pageSize: pagination.pageSize
     });
@@ -224,9 +217,12 @@ const fetchQAList = async () => {
       // 转换为表格数据格式
       qaList.value = response.data.map((item, index) => ({
         id: ((pagination.current - 1) * pagination.pageSize) + index + 1,
-        question: item.query || item.question,
-        answer: item.response || item.answer,
-        label: item.category || item.label
+        question: item.question,
+        answer: item.answer,
+        label: item.label,
+        source: item.source,
+        chain_of_thought: item.chain_of_thought,
+        id: item.id
       }));
       
       pagination.total = response.total || 0;

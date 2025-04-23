@@ -114,20 +114,11 @@ class DatasetService:
     
     @staticmethod
     def list_data(
-        format_type: str = "jsonl", 
-        style: str = "Alpaca", 
         input_file: str = "qa_dataset.jsonl", 
-        template: Optional[Dict] = None,
         page: int = 1,
         page_size: int = 20
     ) -> Dict[str, Any]:
         """预览数据转换结果"""
-        if format_type not in EXPORT_FORMATS:
-            raise ValueError(f"不支持的文件格式: {format_type}")
-        
-        if style not in DATASET_STYLES:
-            raise ValueError(f"不支持的数据集风格: {style}")
-        
         # 读取原始数据
         file_path = os.path.join(settings.OUTPUT_DIR, input_file)
         data = DatasetService.read_jsonl_file(file_path)
@@ -136,12 +127,16 @@ class DatasetService:
         
         # 根据选择的风格转换数据
         converted_data = []
-        if style == "Alpaca":
-            converted_data = DatasetService.convert_to_alpaca_format(data)
-        elif style == "ShareGPT":
-            converted_data = DatasetService.convert_to_sharegpt_format(data)
-        elif style == "Custom":
-            converted_data = DatasetService.convert_to_custom_format(data, template)
+    
+        for item in data:
+            custom_item = {}
+            custom_item["id"] = item.get("id", None)
+            custom_item["question"] = item.get("question", "")
+            custom_item["answer"] = item.get("answer", "")
+            custom_item["label"] = item.get("label", "")
+            custom_item["source"] = item.get("source", "")
+            custom_item["chain_of_thought"] = item.get("chainOfThought", "")
+            converted_data.append(custom_item)
             
         # 将数据倒序排列
         converted_data.reverse()
@@ -481,6 +476,9 @@ class DatasetService:
         
         # 更新markdown_manager.json中相应文件的isDataset状态
         DatasetService.update_markdown_dataset_status(files)
+
+        # 为没有id的数据行添加自增id
+        DatasetService.add_missing_ids(output_file)
         
         print(f"提取了 {len(results)} 个问答对")
         return output_path
@@ -582,8 +580,25 @@ class DatasetService:
         if not question or not answer:
             raise ValueError("问题和答案不能为空")
         
+        # 确保输出目录存在
+        os.makedirs(settings.OUTPUT_DIR, exist_ok=True)
+        
+        # 读取现有数据以找到最大id
+        dataset_path = os.path.join(settings.OUTPUT_DIR, "qa_dataset.jsonl")
+        max_id = 0
+        
+        if os.path.exists(dataset_path):
+            try:
+                data = DatasetService.read_jsonl_file(dataset_path)
+                for item in data:
+                    if "id" in item and isinstance(item["id"], (int, float)):
+                        max_id = max(max_id, int(item["id"]))
+            except Exception as e:
+                logging.warning(f"读取数据集获取最大id时出错: {str(e)}")
+        
         # 构建问答对数据
         qa_item = {
+            "id": max_id + 1,
             "question": question,
             "answer": answer
         }
@@ -595,11 +610,7 @@ class DatasetService:
         if label:
             qa_item["label"] = label
             
-        # 确保输出目录存在
-        os.makedirs(settings.OUTPUT_DIR, exist_ok=True)
-        
         # 写入数据
-        dataset_path = os.path.join(settings.OUTPUT_DIR, "qa_dataset.jsonl")
         try:
             with open(dataset_path, "a", encoding="utf-8") as f:
                 f.write(json.dumps(qa_item, ensure_ascii=False) + "\n")
@@ -616,6 +627,70 @@ class DatasetService:
         except Exception as e:
             logging.error(f"添加问答对失败: {str(e)}")
             raise ValueError(f"添加问答对失败: {str(e)}")
+    
+    @staticmethod
+    def add_missing_ids(input_file: str = INPUT_FILE) -> Dict[str, Any]:
+        """
+        为数据集中没有id的数据行添加自增id
+        
+        参数:
+        - input_file: 输入文件路径，默认为qa_dataset.jsonl
+        
+        返回:
+        - Dict[str, Any]: 包含操作状态信息的字典
+        """
+        file_path = os.path.join(settings.OUTPUT_DIR, input_file)
+        if not os.path.exists(file_path):
+            raise ValueError(f"文件 {input_file} 不存在")
+        
+        # 读取原始数据
+        data = DatasetService.read_jsonl_file(file_path)
+        if not data:
+            return {
+                "status": "warning",
+                "message": "文件为空，无需处理",
+                "total": 0,
+                "updated": 0
+            }
+        
+        # 备份原始文件
+        backup_path = os.path.join(settings.OUTPUT_DIR, f"{input_file}.bak.{datetime.now().strftime('%Y%m%d%H%M%S')}")
+        try:
+            shutil.copy2(file_path, backup_path)
+        except Exception as e:
+            logging.warning(f"备份原始文件失败: {str(e)}")
+        
+        # 为没有id的数据项添加id
+        current_id = 1
+        updated_count = 0
+        
+        for item in data:
+            if "id" not in item:
+                item["id"] = current_id
+                updated_count += 1
+            else:
+                # 如果已有id且为数字，更新当前id以保持递增
+                try:
+                    if isinstance(item["id"], (int, float)):
+                        current_id = max(current_id, int(item["id"]) + 1)
+                except (ValueError, TypeError):
+                    pass
+            current_id += 1
+        
+        # 将更新后的数据写回文件
+        try:
+            with open(file_path, "w", encoding="utf-8") as f:
+                for item in data:
+                    f.write(json.dumps(item, ensure_ascii=False) + "\n")
+        except Exception as e:
+            raise ValueError(f"写入更新后的数据集失败: {str(e)}")
+        
+        return {
+            "status": "success",
+            "message": f"成功为 {updated_count} 条数据添加id",
+            "total": len(data),
+            "updated": updated_count
+        }
     
     # 辅助方法
     
