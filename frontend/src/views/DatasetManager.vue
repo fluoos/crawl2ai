@@ -90,9 +90,14 @@
             <a-tag color="default" v-else>未标记</a-tag>
           </template>
           <template v-else-if="column.key === 'action'">
-            <a-button type="link" danger @click="confirmDelete(record)">
-              删除
-            </a-button>
+            <a-space>
+              <a-button type="link" size="small" @click="editItem(record)">
+                编辑
+              </a-button>
+              <a-button type="link" size="small" danger @click="confirmDelete(record)">
+                删除
+              </a-button>
+            </a-space>
           </template>
         </template>
       </a-table>
@@ -108,6 +113,12 @@
       v-model:visible="addDataDialogVisible"
       @add-success="handleAddSuccess"
     />
+    <!-- 编辑问答对对话框 -->
+    <EditDataDialog
+      v-model:visible="editModalVisible"
+      :item-data="editItemData"
+      @edit-success="handleEditSuccess"
+    />
   </div>
 </template>
 
@@ -117,6 +128,7 @@ import { message, Modal } from 'ant-design-vue';
 import { DatabaseOutlined, CheckCircleOutlined, BarChartOutlined, ExportOutlined, ReloadOutlined, DeleteOutlined } from '@ant-design/icons-vue';
 import ExportDialog from '../components/business/ExportDialog.vue';
 import AddDataDialog from '../components/business/AddDataDialog.vue';
+import EditDataDialog from '../components/business/EditDataDialog.vue';
 import { getDataStats, getDatasetList, deleteQAItems } from '../services/dataset';
 import { downloadFile } from '../utils/download';
 
@@ -171,10 +183,14 @@ const columns = [
   {
     title: '操作',
     key: 'action',
-    width: 86,
+    width: 116,
     fixed: 'right'
   }
 ];
+
+// 编辑问答对相关变量
+const editModalVisible = ref(false);
+const editItemData = ref({});
 
 // 初始化
 onMounted(() => {
@@ -339,6 +355,24 @@ const confirmBatchDelete = () => {
 // 行选择变化处理
 const onSelectChange = (keys) => {
   selectedRowKeys.value = keys;
+};
+
+// 打开编辑对话框
+const editItem = (record) => {
+  editItemData.value = {
+    id: record.id,
+    question: record.question,
+    answer: record.answer,
+    chainOfThought: record.chain_of_thought || '',
+    label: record.label || ''
+  };
+  editModalVisible.value = true;
+};
+
+// 编辑成功处理
+const handleEditSuccess = () => {
+  // 刷新数据和统计
+  fetchStatsAndQAList();
 };
 </script>
 

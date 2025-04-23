@@ -692,6 +692,95 @@ class DatasetService:
             "updated": updated_count
         }
     
+    @staticmethod
+    def update_qa_item(
+        id: int,
+        question: str,
+        answer: str,
+        chain_of_thought: Optional[str] = None,
+        label: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        编辑数据集中的问答对
+        
+        参数:
+        - id: 要编辑的问答对ID
+        - question: 更新后的问题内容
+        - answer: 更新后的答案内容
+        - chain_of_thought: 更新后的思考链，可选
+        - label: 更新后的分类标签，可选
+        
+        返回:
+        - Dict[str, Any]: 包含操作状态信息的字典
+        """
+        if not question or not answer:
+            raise ValueError("问题和答案不能为空")
+            
+        dataset_path = os.path.join(settings.OUTPUT_DIR, "qa_dataset.jsonl")
+        
+        if not os.path.exists(dataset_path):
+            raise ValueError("数据集文件不存在")
+        
+        # 读取所有数据
+        items = []
+        try:
+            with open(dataset_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    if line.strip():
+                        items.append(json.loads(line))
+        except Exception as e:
+            raise ValueError(f"读取数据集文件失败: {str(e)}")
+            
+        # 查找并更新指定ID的项
+        found = False
+        for item in items:
+            if "id" in item and item["id"] == id:
+                item["question"] = question
+                item["answer"] = answer
+                
+                # 更新可选字段
+                if chain_of_thought is not None:
+                    item["chainOfThought"] = chain_of_thought
+                elif "chainOfThought" in item:
+                    # 如果前端没有提供该字段且原数据有该字段，保留原值
+                    pass
+                    
+                if label is not None:
+                    item["label"] = label
+                elif "label" in item:
+                    # 如果前端没有提供该字段且原数据有该字段，保留原值
+                    pass
+                    
+                found = True
+                break
+                
+        if not found:
+            raise ValueError(f"未找到ID为 {id} 的问答对")
+            
+        # 将更新后的数据写回文件
+        try:
+            with open(dataset_path, "w", encoding="utf-8") as f:
+                for item in items:
+                    f.write(json.dumps(item, ensure_ascii=False) + "\n")
+        except Exception as e:
+            raise ValueError(f"写入更新后的数据集失败: {str(e)}")
+            
+        # 获取更新后的统计信息
+        stats = DatasetService.get_stats()
+        
+        return {
+            "status": "success",
+            "message": f"成功更新ID为 {id} 的问答对",
+            "updated_item": {
+                "id": id,
+                "question": question,
+                "answer": answer,
+                "chainOfThought": chain_of_thought,
+                "label": label
+            },
+            "stats": stats
+        }
+    
     # 辅助方法
     
     @staticmethod

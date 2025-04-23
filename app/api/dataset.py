@@ -10,7 +10,7 @@ import asyncio
 import logging
 from app.core.config import settings
 from app.core.deps import get_api_key
-from app.schemas.dataset import DeleteItemsRequest, DatasetListRequest, DatasetExportRequest, AddQAItemRequest
+from app.schemas.dataset import DeleteItemsRequest, DatasetListRequest, DatasetExportRequest, AddQAItemRequest, UpdateQAItemRequest
 from app.services.dataset_service import DatasetService, EXPORT_FORMATS, DATASET_STYLES, INPUT_FILE
 
 router = APIRouter()
@@ -130,6 +130,26 @@ async def add_qa_item(
         print(f"添加问答对失败: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.post("/update")
+async def update_qa_item(
+    params: UpdateQAItemRequest,
+    api_key: str = Depends(get_api_key)
+):
+    """编辑数据集中的问答对"""
+    print(f"编辑问答对: {params}")
+    try:
+        return DatasetService.update_qa_item(
+            id=params.id,
+            question=params.question,
+            answer=params.answer,
+            chain_of_thought=params.chainOfThought,
+            label=params.label
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        print(f"编辑问答对失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/convert")
 async def convert_to_dataset(

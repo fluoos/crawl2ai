@@ -21,3 +21,10 @@ class AddQAItemRequest(BaseModel):
     answer: str = Field(..., description="答案内容")
     chainOfThought: Optional[str] = Field(None, description="思考链，记录解答过程")
     label: Optional[str] = Field(None, description="问答对的标签分类")
+
+class UpdateQAItemRequest(BaseModel):
+    id: int = Field(..., description="要编辑的问答对ID")
+    question: str = Field(..., description="更新后的问题内容")
+    answer: str = Field(..., description="更新后的答案内容")
+    chainOfThought: Optional[str] = Field(None, description="更新后的思考链，记录解答过程")
+    label: Optional[str] = Field(None, description="更新后的问答对标签分类")
