@@ -282,9 +282,8 @@ const confirmDelete = (record) => {
     cancelText: '取消',
     onOk: async () => {
       try {
-        // 发送删除请求，注意这里要传实际索引（由于表格的ID是从1开始的，需要转换）
-        const realIndex = record.id - 1;
-        const response = await deleteQAItems([realIndex]);
+        // 发送删除请求
+        const response = await deleteQAItems([record.id]);
         
         if (response && response.status === 'success') {
           message.success(response.message || '删除成功');
@@ -316,9 +315,8 @@ const confirmBatchDelete = () => {
     cancelText: '取消',
     onOk: async () => {
       try {
-        // 获取真实索引（页面ID从1开始，后端从0开始）
-        const realIndices = selectedRowKeys.value.map(id => id - 1);
-        const response = await deleteQAItems(realIndices);
+        // 获取真实索引
+        const response = await deleteQAItems(selectedRowKeys.value);
         
         if (response && response.status === 'success') {
           message.success(response.message || '批量删除成功');

@@ -233,25 +233,25 @@ class DatasetService:
             raise ValueError(f"读取数据集文件失败: {str(e)}")
         
         # 检查ID是否有效
-        max_id = len(items) - 1
-        invalid_ids = [id for id in ids if id < 0 or id > max_id]
+        existing_ids = {item.get("id") for item in items if "id" in item}
+        invalid_ids = [id for id in ids if id not in existing_ids]
         if invalid_ids:
-            raise ValueError(f"无效的ID: {invalid_ids}，有效范围: 0-{max_id}")
+            raise ValueError(f"无效的ID: {invalid_ids}")
         
         # 备份原始文件
-        backup_path = os.path.join(settings.OUTPUT_DIR, f"qa_dataset.jsonl.bak.{datetime.now().strftime('%Y%m%d%H%M%S')}")
-        try:
-            shutil.copy2(dataset_path, backup_path)
-        except Exception as e:
-            logging.warning(f"备份原始文件失败: {str(e)}")
+        # backup_path = os.path.join(settings.OUTPUT_DIR, f"qa_dataset.jsonl.bak.{datetime.now().strftime('%Y%m%d%H%M%S')}")
+        # try:
+        #     shutil.copy2(dataset_path, backup_path)
+        # except Exception as e:
+        #     logging.warning(f"备份原始文件失败: {str(e)}")
         
         # 删除指定ID的项
         to_delete = set(ids)
         remaining_items = []
         deleted_count = 0
         
-        for i, item in enumerate(items):
-            if i in to_delete:
+        for item in items:
+            if "id" in item and item["id"] in to_delete:
                 deleted_count += 1
             else:
                 remaining_items.append(item)
