@@ -90,9 +90,14 @@
             <a-tag color="default" v-else>未标记</a-tag>
           </template>
           <template v-else-if="column.key === 'action'">
-            <a-button type="link" danger @click="confirmDelete(record)">
-              删除
-            </a-button>
+            <a-space>
+              <a-button type="link" size="small" @click="editItem(record)">
+                编辑
+              </a-button>
+              <a-button type="link" size="small" danger @click="confirmDelete(record)">
+                删除
+              </a-button>
+            </a-space>
           </template>
         </template>
       </a-table>
@@ -108,6 +113,12 @@
       v-model:visible="addDataDialogVisible"
       @add-success="handleAddSuccess"
     />
+    <!-- 编辑问答对对话框 -->
+    <EditDataDialog
+      v-model:visible="editModalVisible"
+      :item-data="editItemData"
+      @edit-success="handleEditSuccess"
+    />
   </div>
 </template>
 
@@ -117,6 +128,7 @@ import { message, Modal } from 'ant-design-vue';
 import { DatabaseOutlined, CheckCircleOutlined, BarChartOutlined, ExportOutlined, ReloadOutlined, DeleteOutlined } from '@ant-design/icons-vue';
 import ExportDialog from '../components/business/ExportDialog.vue';
 import AddDataDialog from '../components/business/AddDataDialog.vue';
+import EditDataDialog from '../components/business/EditDataDialog.vue';
 import { getDataStats, getDatasetList, deleteQAItems } from '../services/dataset';
 import { downloadFile } from '../utils/download';
 
@@ -171,10 +183,14 @@ const columns = [
   {
     title: '操作',
     key: 'action',
-    width: 86,
+    width: 116,
     fixed: 'right'
   }
 ];
+
+// 编辑问答对相关变量
+const editModalVisible = ref(false);
+const editItemData = ref({});
 
 // 初始化
 onMounted(() => {
@@ -209,13 +225,6 @@ const fetchQAList = async () => {
   tableLoading.value = true;
   try {
     const response = await getDatasetList({
-      format: 'jsonl',
-      style: 'Custom',
-      template: {
-        query: { field: 'question' },
-        response: { field: 'answer' },
-        category: { field: 'label' }
-      },
       page: pagination.current,
       pageSize: pagination.pageSize
     });
@@ -224,9 +233,12 @@ const fetchQAList = async () => {
       // 转换为表格数据格式
       qaList.value = response.data.map((item, index) => ({
         id: ((pagination.current - 1) * pagination.pageSize) + index + 1,
-        question: item.query || item.question,
-        answer: item.response || item.answer,
-        label: item.category || item.label
+        question: item.question,
+        answer: item.answer,
+        label: item.label,
+        source: item.source,
+        chain_of_thought: item.chain_of_thought,
+        id: item.id
       }));
       
       pagination.total = response.total || 0;
@@ -286,9 +298,8 @@ const confirmDelete = (record) => {
     cancelText: '取消',
     onOk: async () => {
       try {
-        // 发送删除请求，注意这里要传实际索引（由于表格的ID是从1开始的，需要转换）
-        const realIndex = record.id - 1;
-        const response = await deleteQAItems([realIndex]);
+        // 发送删除请求
+        const response = await deleteQAItems([record.id]);
         
         if (response && response.status === 'success') {
           message.success(response.message || '删除成功');
@@ -320,9 +331,8 @@ const confirmBatchDelete = () => {
     cancelText: '取消',
     onOk: async () => {
       try {
-        // 获取真实索引（页面ID从1开始，后端从0开始）
-        const realIndices = selectedRowKeys.value.map(id => id - 1);
-        const response = await deleteQAItems(realIndices);
+        // 获取真实索引
+        const response = await deleteQAItems(selectedRowKeys.value);
         
         if (response && response.status === 'success') {
           message.success(response.message || '批量删除成功');
@@ -345,6 +355,24 @@ const confirmBatchDelete = () => {
 // 行选择变化处理
 const onSelectChange = (keys) => {
   selectedRowKeys.value = keys;
+};
+
+// 打开编辑对话框
+const editItem = (record) => {
+  editItemData.value = {
+    id: record.id,
+    question: record.question,
+    answer: record.answer,
+    chainOfThought: record.chain_of_thought || '',
+    label: record.label || ''
+  };
+  editModalVisible.value = true;
+};
+
+// 编辑成功处理
+const handleEditSuccess = () => {
+  // 刷新数据和统计
+  fetchStatsAndQAList();
 };
 </script>
 

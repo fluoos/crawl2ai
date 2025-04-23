@@ -62,3 +62,16 @@ export const addQAItem = (data) => {
     data
   });
 };
+
+/**
+ * 更新问答对
+ * @param {Object} data 问答对数据，包含question、answer、chainOfThought和label字段
+ * @returns {Promise}
+ */
+export const updateQAItem = (data) => {
+  return request({
+    url: '/api/dataset/update',
+    method: 'post',
+    data
+  });
+};
