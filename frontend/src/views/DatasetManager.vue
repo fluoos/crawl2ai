@@ -80,10 +80,14 @@
       >
         <template #bodyCell="{ column, text, record }">
           <template v-if="column.dataIndex === 'question'">
-            <div class="qa-text">{{ text }}</div>
+            <a-tooltip :title="text" :overlayStyle="{ maxWidth: '620px', wordBreak: 'break-all' }">
+              <div class="qa-text qa-truncate">{{ text }}</div>
+            </a-tooltip>
           </template>
           <template v-else-if="column.dataIndex === 'answer'">
-            <div class="qa-text">{{ text }}</div>
+            <a-tooltip :title="text" :overlayStyle="{ maxWidth: '620px', wordBreak: 'break-all' }">
+              <div class="qa-text qa-truncate">{{ text }}</div>
+            </a-tooltip>
           </template>
           <template v-else-if="column.dataIndex === 'label'">
             <a-tag color="blue" v-if="text">{{ text }}</a-tag>
@@ -124,7 +128,7 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue';
-import { message, Modal } from 'ant-design-vue';
+import { message, Modal, Tooltip } from 'ant-design-vue';
 import { DatabaseOutlined, CheckCircleOutlined, BarChartOutlined, ExportOutlined, ReloadOutlined, DeleteOutlined } from '@ant-design/icons-vue';
 import ExportDialog from '../components/business/ExportDialog.vue';
 import AddDataDialog from '../components/business/AddDataDialog.vue';
@@ -393,8 +397,15 @@ const handleEditSuccess = () => {
 .qa-text {
   white-space: pre-wrap;
   word-break: break-word;
-  max-height: 100px;
-  overflow-y: auto;
   padding: 4px;
+}
+
+.qa-truncate {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-height: none;
 }
 </style> 

@@ -37,6 +37,18 @@
         <template #body-size="{ record }">
           {{ formatFileSize(record.size) }}
         </template>
+        <template #body-source="{ record }">
+          <a-tooltip v-if="record.url" :title="record.url">
+            <a 
+              :href="record.url" 
+              target="_blank"
+              class="source-link"
+            >
+              网页链接
+            </a>
+          </a-tooltip>
+          <span v-else>本地上传</span>
+        </template>
         <template #body-action="{ record }">
           <a-space>
             <a-button type="link" size="small" @click="previewFile(record)">
@@ -92,7 +104,7 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue';
-import { message, Modal } from 'ant-design-vue';
+import { message, Modal, Tooltip } from 'ant-design-vue';
 import { ReloadOutlined } from '@ant-design/icons-vue';
 import DataTable from '../components/common/DataTable.vue';
 import FileUploader from '../components/common/FileUploader.vue';
@@ -136,6 +148,11 @@ const columns = [
   {
     title: '大小',
     dataIndex: 'size',
+    width: 120
+  },
+  {
+    title: '来源',
+    dataIndex: 'source',
     width: 120
   },
   {
@@ -307,6 +324,16 @@ const formatFileSize = (bytes) => {
 
 .card-wrapper {
   margin-bottom: 24px;
+}
+
+.source-link {
+  color: rgba(0, 0, 0, 0.85);
+  text-decoration: none;
+}
+
+.source-link:hover {
+  color: #1890ff;
+  text-decoration: underline;
 }
 
 .file-preview {
