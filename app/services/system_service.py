@@ -1,69 +1,382 @@
 import os
 import json
-from typing import Dict, Any
+import uuid
+from typing import Dict, Any, List
 from app.core.config import settings
 
 class SystemService:
     """系统服务类，处理所有与系统配置相关的业务逻辑"""
     
-    @staticmethod
-    def get_system_config() -> Dict[str, Any]:
-        """获取系统配置"""
-        # 默认配置，与API层的SystemConfig保持一致
-        default_config = {
-            "baseUrl": "https://api.deepseek.com",
-            "model": "deepseek-chat",
-            "apiKey": "",
-            "temperature": 0.7,
-            "maxTokens": 4000,
-            "logLevel": "info"
-        }
-        
-        # 检查配置文件是否存在
-        config_file = os.path.join("config", "system.json")
-        if os.path.exists(config_file):
-            with open(config_file, "r", encoding="utf-8") as f:
-                config = json.load(f)
-            
-            # 使用默认配置填充缺失的字段
-            for key in default_config:
-                if key not in config:
-                    config[key] = default_config[key]
-            
-            # 不返回API密钥完整内容，仅返回是否已设置
-            if config.get("apiKey"):
-                config["apiKey"] = "******" + config["apiKey"][-4:]
-            
-            return config
-        else:
-            # 返回默认配置
-            config = default_config.copy()
-            config["apiKey"] = settings.DEEPSEEK_API_KEY if settings.DEEPSEEK_API_KEY else ""
-            return config
+    CONFIG_DIR = "output/config"
+    SYSTEM_CONFIG_FILE = "system.json"
+    MODELS_CONFIG_FILE = "models.json"
+    PROMPTS_CONFIG_FILE = "prompts.json"
+    FILE_STRATEGY_CONFIG_FILE = "file_strategy.json"
     
     @staticmethod
-    def update_system_config(config_data: Dict[str, Any]) -> Dict[str, Any]:
-        """更新系统配置"""
-        # 确保配置目录存在
-        os.makedirs("config", exist_ok=True)
+    def _ensure_config_dir():
+        """确保配置目录存在"""
+        try:
+            dir_path = SystemService.CONFIG_DIR
+            print(f"确保目录存在: {dir_path}")
+            os.makedirs(dir_path, exist_ok=True)
+            print(f"目录检查/创建成功: {dir_path}")
+        except Exception as e:
+            print(f"创建目录 {SystemService.CONFIG_DIR} 时出错: {str(e)}")
+            raise e
+    
+    @staticmethod
+    def _get_file_path(filename):
+        """获取配置文件路径"""
+        return os.path.join(SystemService.CONFIG_DIR, filename)
+    
+    @staticmethod
+    def _read_json_file(filename, default_value=None):
+        """读取JSON文件，如果文件不存在则返回默认值"""
+        file_path = SystemService._get_file_path(filename)
+        print(f"尝试读取文件: {file_path}")
+        try:
+            if os.path.exists(file_path):
+                with open(file_path, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            else:
+                print(f"文件不存在，返回默认值: {default_value}")
+                return default_value
+        except Exception as e:
+            print(f"读取文件 {file_path} 时出错: {str(e)}")
+            return default_value
+    
+    @staticmethod
+    def _write_json_file(filename, data):
+        """写入JSON文件"""
+        try:
+            SystemService._ensure_config_dir()
+            file_path = SystemService._get_file_path(filename)
+            print(f"尝试写入文件: {file_path}")
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+            print(f"文件 {file_path} 写入成功")
+        except Exception as e:
+            print(f"写入文件 {file_path} 时出错: {str(e)}")
+            raise e
+    
+    @staticmethod
+    def get_default_models():
+        """获取默认的模型提供商配置"""
+        return [
+            {
+                "id": "1",
+                "name": "Ollama",
+                "apiEndpoint": "http://127.0.0.1:11434/api",
+                "type": "chat",
+                "temperature": 0.7,
+                "maxTokens": 4000,
+                "isDefault": False,
+                "apiKey": "",
+                "model": "llama3.1:8b"
+            },
+            {
+                "id": "2",
+                "name": "DeepSeek",
+                "apiEndpoint": "https://api.deepseek.com/v1/",
+                "type": "chat",
+                "temperature": 0.7,
+                "maxTokens": 4000,
+                "isDefault": False,
+                "apiKey": "",
+                "model": "deepseek-chat"
+            },
+            {
+                "id": "3",
+                "name": "OpenAI",
+                "apiEndpoint": "https://api.openai.com/v1/",
+                "type": "chat",
+                "temperature": 0.7,
+                "maxTokens": 4000,
+                "isDefault": False,
+                "apiKey": "",
+                "model": "gpt-4o"
+            },
+            {
+                "id": "4",
+                "name": "OpenAI",
+                "apiEndpoint": "https://api.openai.com/v1/",
+                "type": "chat",
+                "temperature": 0.7,
+                "maxTokens": 4000,
+                "isDefault": False,
+                "apiKey": "",
+                "model": "gpt-4o-mini"
+            },
+            {
+                "id": "5",
+                "name": "OpenAI",
+                "apiEndpoint": "https://api.openai.com/v1/",
+                "type": "chat",
+                "temperature": 0.7,
+                "maxTokens": 4000,
+                "isDefault": False,
+                "apiKey": "",
+                "model": "o1-mini"
+            },
+            {
+                "id": "6",
+                "name": "硅基流动",
+                "apiEndpoint": "https://api.siliconflow.cn/v1/",
+                "type": "chat",
+                "temperature": 0.7,
+                "maxTokens": 4000,
+                "isDefault": False,
+                "apiKey": "",
+                "model": "deepseek-ai/DeepSeek-R1"
+            },
+            {
+                "id": "7",
+                "name": "智谱AI",
+                "apiEndpoint": "https://open.bigmodel.cn/api/paas/v4/",
+                "type": "chat",
+                "temperature": 0.7,
+                "maxTokens": 4000,
+                "isDefault": False,
+                "apiKey": "",
+                "model": "glm-4-flash"
+            },
+            {
+                "id": "8",
+                "name": "Groq",
+                "apiEndpoint": "https://api.groq.com/openai",
+                "type": "chat",
+                "temperature": 0.7,
+                "maxTokens": 4000,
+                "isDefault": False,
+                "apiKey": "",
+                "model": "Gemma 7B"
+            },
+            {
+                "id": "9",
+                "name": "阿里云百炼",
+                "apiEndpoint": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+                "type": "chat",
+                "temperature": 0.7,
+                "maxTokens": 4000,
+                "isDefault": False,
+                "apiKey": "",
+                "model": "qwen-max-latest"
+            }
+        ]
+    
+    @staticmethod
+    def get_models() -> Dict[str, Any]:
+        """获取所有模型配置"""
+        models_list = SystemService._read_json_file(SystemService.MODELS_CONFIG_FILE, [])
         
-        # 读取现有配置（如果存在）
-        config_file = os.path.join("config", "system.json")
-        existing_config = {}
-        if os.path.exists(config_file):
-            with open(config_file, "r", encoding="utf-8") as f:
-                existing_config = json.load(f)
+        # 如果没有模型数据
+        if len(models_list) == 0:
+            print("如果没有模型数据，写入默认模型")
+            models_list = SystemService.get_default_models()
         
-        # 如果apiKey字段是掩码版本，保留原始的apiKey
-        if config_data["apiKey"].startswith("******") and "apiKey" in existing_config:
-            config_data["apiKey"] = existing_config["apiKey"]
+        # 确保目录存在并保存更新的配置
+        SystemService._write_json_file(SystemService.MODELS_CONFIG_FILE, models_list)
+        
+        # 遍历所有模型，对API密钥进行掩码处理
+        for model in models_list:
+            if model.get("apiKey"):
+                model["apiKey"] = "******" + model["apiKey"][-4:] if len(model["apiKey"]) > 4 else "******"
+        return {
+            "data": models_list,
+            "total": len(models_list),
+        }
+    
+    @staticmethod
+    def add_model(model_data: Dict[str, Any]) -> Dict[str, Any]:
+        """添加模型配置"""
+        print(f"添加模型配置: {model_data}")
+        # 读取现有模型列表
+        models_list = SystemService._read_json_file(SystemService.MODELS_CONFIG_FILE, [])
+
+        # 如果没有模型数据
+        if len(models_list) == 0:
+            print("如果没有模型数据，写入默认模型")
+            models_list = SystemService.get_default_models()
+        
+        # 生成ID
+        custom_item = {}
+        custom_item["id"] = str(uuid.uuid4())
+        
+        # 复制模型数据到新对象
+        try:
+            required_fields = ["name", "apiEndpoint", "apiKey", "model"]
+            for field in required_fields:
+                if field not in model_data:
+                    return {"status": "error", "message": f"缺少必要字段: {field}"}
+                custom_item[field] = model_data[field]
+            
+            # 处理可选字段
+            custom_item["isDefault"] = model_data.get("isDefault", False)
+        except KeyError as e:
+            return {"status": "error", "message": f"缺少必要字段: {str(e)}"}
+        except Exception as e:
+            return {"status": "error", "message": f"处理模型数据时出错: {str(e)}"}
+
+        if custom_item.get("isDefault", False):
+            # 将其他模型设置为非默认
+            for model in models_list:
+                model["isDefault"] = False
+
+        models_list.append(custom_item)
+
+        # 保存配置
+        SystemService._write_json_file(SystemService.MODELS_CONFIG_FILE, models_list)
+        
+        return {"status": "success", "message": "模型已添加", "id": custom_item["id"]}
+    
+    @staticmethod
+    def update_model(model_data: Dict[str, Any]) -> Dict[str, Any]:
+        """更新模型配置"""
+        print(f"更新模型配置: {model_data}")
+        # 读取现有模型列表
+        models_list = SystemService._read_json_file(SystemService.MODELS_CONFIG_FILE, [])
+        
+        # 检查必要字段
+        try:
+            if "id" not in model_data:
+                return {"status": "error", "message": "缺少必要字段: id"}
+                
+            required_fields = ["name", "apiEndpoint", "apiKey", "model"]
+            for field in required_fields:
+                if field not in model_data:
+                    return {"status": "error", "message": f"缺少必要字段: {field}"}
+        except Exception as e:
+            return {"status": "error", "message": f"处理模型数据时出错: {str(e)}"}
+        
+        # 查找要更新的模型
+        model_found = False
+        for i, model in enumerate(models_list):
+            if model["id"] == model_data["id"]:
+                # 如果API密钥是掩码版本，保留原始API密钥
+                if model_data.get("apiKey", "").startswith("******"):
+                    model_data["apiKey"] = model["apiKey"]
+                
+                # 处理可选字段，保留原值如果没有提供
+                model_data["type"] = model_data.get("type", model.get("type", "chat"))
+                model_data["temperature"] = model_data.get("temperature", model.get("temperature", 0.7))
+                model_data["maxTokens"] = model_data.get("maxTokens", model.get("maxTokens", 4000))
+                model_data["isDefault"] = model_data.get("isDefault", model.get("isDefault", False))
+                
+                # 检查是否设置为默认模型
+                if model_data.get("isDefault", False) and not model.get("isDefault", False):
+                    # 将其他模型设置为非默认
+                    for m in models_list:
+                        if m["id"] != model_data["id"]:
+                            m["isDefault"] = False
+                
+                # 更新模型信息
+                models_list[i] = model_data
+                model_found = True
+                break
+        
+        if not model_found:
+            return {"status": "error", "message": "找不到指定的模型"}
         
         # 保存配置
-        with open(config_file, "w", encoding="utf-8") as f:
-            json.dump(config_data, f, ensure_ascii=False, indent=2)
+        SystemService._write_json_file(SystemService.MODELS_CONFIG_FILE, models_list)
         
-        # 更新环境变量中的API密钥
-        if config_data["apiKey"] and not config_data["apiKey"].startswith("******"):
-            settings.DEEPSEEK_API_KEY = config_data["apiKey"]
+        return {"status": "success", "message": "模型已更新"}
+    
+    @staticmethod
+    def delete_model(model_id: str) -> Dict[str, Any]:
+        """删除模型配置"""
+        print(f"删除模型配置，ID: {model_id}")
+        # 读取现有模型列表
+        models_list = SystemService._read_json_file(SystemService.MODELS_CONFIG_FILE, [])
         
-        return {"status": "success", "message": "配置已更新"}
+        # 检查模型ID是否有效
+        if not model_id:
+            return {"status": "error", "message": "未提供有效的模型ID"}
+        
+        # 查找要删除的模型
+        model_to_delete = None
+        for i, model in enumerate(models_list):
+            if model["id"] == model_id:
+                model_to_delete = model
+                models_list.pop(i)
+                break
+        
+        if not model_to_delete:
+            return {"status": "error", "message": "找不到指定的模型"}
+        
+        # 如果删除的是默认模型，且还有其他模型，则将第一个模型设置为默认
+        if model_to_delete.get("isDefault", False) and models_list:
+            models_list[0]["isDefault"] = True
+            print(f"已将模型 {models_list[0]['name']} 设置为新的默认模型")
+        
+        # 保存配置
+        SystemService._write_json_file(SystemService.MODELS_CONFIG_FILE, models_list)
+        
+        return {"status": "success", "message": "模型已删除"}
+    
+    @staticmethod
+    def set_default_model(model_id: str) -> Dict[str, Any]:
+        """设置默认模型"""
+        print(f"设置默认模型，ID: {model_id}")
+        # 读取现有模型列表
+        models_list = SystemService._read_json_file(SystemService.MODELS_CONFIG_FILE, [])
+        
+        # 检查模型ID是否有效
+        if not model_id:
+            return {"status": "error", "message": "未提供有效的模型ID"}
+        
+        # 查找要设置为默认的模型
+        model_found = False
+        for model in models_list:
+            if model["id"] == model_id:
+                model["isDefault"] = True
+                model_found = True
+                print(f"已将模型 {model['name']} 设置为默认")
+            else:
+                model["isDefault"] = False
+        
+        if not model_found:
+            return {"status": "error", "message": "找不到指定的模型"}
+        
+        # 保存配置
+        SystemService._write_json_file(SystemService.MODELS_CONFIG_FILE, models_list)
+        
+        return {"status": "success", "message": "已将模型设置为默认"}
+    
+    @staticmethod
+    def get_prompts() -> Dict[str, Any]:
+        """获取提示词配置"""
+        default_prompts = {
+            "fileConversion": "请将以下文本转换为问答对，确保问题和答案有意义且相互关联。"
+        }
+        
+        return SystemService._read_json_file(SystemService.PROMPTS_CONFIG_FILE, default_prompts)
+    
+    @staticmethod
+    def update_prompts(prompts_data: Dict[str, Any]) -> Dict[str, Any]:
+        """更新提示词配置"""
+        # 保存配置
+        SystemService._write_json_file(SystemService.PROMPTS_CONFIG_FILE, prompts_data)
+        
+        return {"status": "success", "message": "提示词配置已更新"}
+    
+    @staticmethod
+    def get_file_strategy() -> Dict[str, Any]:
+        """获取文件策略配置"""
+        default_strategy = {
+            "chunkSize": 2000,
+            "overlapSize": 200,
+            "preserveMarkdown": True,
+            "smartChunking": True
+        }
+        
+        return SystemService._read_json_file(SystemService.FILE_STRATEGY_CONFIG_FILE, default_strategy)
+    
+    @staticmethod
+    def update_file_strategy(strategy_data: Dict[str, Any]) -> Dict[str, Any]:
+        """更新文件策略配置"""
+        # 保存配置
+        SystemService._write_json_file(SystemService.FILE_STRATEGY_CONFIG_FILE, strategy_data)
+        
+        return {"status": "success", "message": "文件策略配置已更新"}
