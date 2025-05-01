@@ -148,7 +148,7 @@
                   <a-button type="primary" html-type="submit" :loading="strategySubmitLoading">
                     保存策略配置
                   </a-button>
-                  <a-button style="margin-left: 10px" @click="resetStrategy">
+                  <a-button style="margin-left: 10px" @click="handleResetStrategy">
                     重置
                   </a-button>
                 </a-form-item>
@@ -246,7 +246,6 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue';
 import { message, Modal } from 'ant-design-vue';
-import { useSystemStore } from '../stores/system';
 import { PlusOutlined } from '@ant-design/icons-vue';
 import {
   getModelList,
@@ -258,10 +257,9 @@ import {
   updatePrompts,
   resetPrompts,
   getFileStrategy,
-  updateFileStrategy
+  updateFileStrategy,
+  resetFileStrategy
 } from '../services/system';
-
-const systemStore = useSystemStore();
 
 // 当前活动标签
 const activeTabKey = ref('models');
@@ -399,15 +397,15 @@ const fetchPrompts = async () => {
 const fetchStrategy = async () => {
   strategyLoading.value = true;
   try {
-    const response = await systemStore.fetchFileStrategy();
-    if (response) {
-      strategyForm.chunkSize = response.chunkSize || 2000;
-      strategyForm.overlapSize = response.overlapSize || 200;
-      strategyForm.preserveMarkdown = response.preserveMarkdown !== false;
-      strategyForm.smartChunking = response.smartChunking !== false;
+    const response = await getFileStrategy();
+    if (response && response.data) {
+      const data = response.data
+      strategyForm.chunkSize = data.chunkSize || 2000;
+      strategyForm.overlapSize = data.overlapSize || 200;
+      strategyForm.preserveMarkdown = data.preserveMarkdown !== false;
+      strategyForm.smartChunking = data.smartChunking !== false;
     }
   } catch (error) {
-    console.error('获取文件策略配置失败:', error);
     message.error('获取文件策略配置失败');
   } finally {
     strategyLoading.value = false;
@@ -562,10 +560,14 @@ const handleResetPrompts = async () => {
 const saveStrategy = async () => {
   strategySubmitLoading.value = true;
   try {
-    await systemStore.saveFileStrategy(strategyForm);
-    message.success('文件策略配置保存成功');
+    const response = await updateFileStrategy(strategyForm);
+    if (response && response.status === 'success') {
+      message.success(response.message || '文件策略配置保存成功');
+    } else {
+      message.error('保存文件策略配置失败');
+    }
+    loadTabData();
   } catch (error) {
-    console.error('保存文件策略配置失败:', error);
     message.error('保存文件策略配置失败');
   } finally {
     strategySubmitLoading.value = false;
@@ -573,9 +575,21 @@ const saveStrategy = async () => {
 };
 
 // 重置文件策略配置
-const resetStrategy = async () => {
-  await fetchStrategy();
-  message.info('文件策略配置已重置');
+const handleResetStrategy = async () => {
+  strategySubmitLoading.value = true;
+  try {
+    const response = await resetFileStrategy();
+    if (response && response.status === 'success') {
+      message.success(response.message || '文件策略重置成功');
+    } else {
+      message.error('文件策略重置失败');
+    }
+    loadTabData();
+  } catch (error) {
+    message.error('文件策略重置失败');
+  } finally {
+    strategySubmitLoading.value = false;
+  }
 };
 </script>
 

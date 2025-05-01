@@ -114,6 +114,19 @@ async def get_file_strategy():
 async def update_file_strategy(strategy: FileStrategyConfig):
     """更新文件策略配置"""
     try:
-        return SystemService.update_file_strategy(strategy.dict())
+        return SystemService.update_file_strategy({
+            "chunkSize": strategy.chunkSize,
+            "overlapSize": strategy.overlapSize,
+            "preserveMarkdown": strategy.preserveMarkdown,
+            "smartChunking": strategy.smartChunking
+        })
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/config/file-strategy/reset")
+async def reset_file_strategy():
+    """重置文件策略配置"""
+    try:
+        return SystemService.reset_file_strategy()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

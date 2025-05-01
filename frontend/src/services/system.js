@@ -45,3 +45,7 @@ export const updateFileStrategy = async (strategy) => {
   return request.post('/api/system/config/file-strategy', strategy);
 };
 
+export const resetFileStrategy = async () => {
+  return request.post('/api/system/config/file-strategy/reset');
+};
+

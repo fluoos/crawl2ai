@@ -426,18 +426,38 @@ class SystemService:
     def get_file_strategy() -> Dict[str, Any]:
         """获取文件策略配置"""
         default_strategy = {
-            "chunkSize": 2000,
-            "overlapSize": 200,
-            "preserveMarkdown": True,
-            "smartChunking": True
+            "data": {
+                "chunkSize": 2000,
+                "overlapSize": 200,
+                "preserveMarkdown": True,
+                "smartChunking": True
+            }
         }
+        strategy = SystemService._read_json_file(SystemService.FILE_STRATEGY_CONFIG_FILE, {})
+        if strategy.get("data", "") == "":
+            strategy = default_strategy
+            SystemService._write_json_file(SystemService.FILE_STRATEGY_CONFIG_FILE, strategy)
         
-        return SystemService._read_json_file(SystemService.FILE_STRATEGY_CONFIG_FILE, default_strategy)
+        return strategy
     
     @staticmethod
     def update_file_strategy(strategy_data: Dict[str, Any]) -> Dict[str, Any]:
         """更新文件策略配置"""
+        print(f"更新文件策略配置: {strategy_data}")
+        default_strategy = {
+            "data": strategy_data
+        }
         # 保存配置
-        SystemService._write_json_file(SystemService.FILE_STRATEGY_CONFIG_FILE, strategy_data)
+        SystemService._write_json_file(SystemService.FILE_STRATEGY_CONFIG_FILE, default_strategy)
         
         return {"status": "success", "message": "文件策略配置已更新"}
+    
+    @staticmethod
+    def reset_file_strategy() -> Dict[str, Any]:
+        """重置文件策略配置"""
+        default_strategy = {
+            "data": ''
+        }
+        SystemService._write_json_file(SystemService.FILE_STRATEGY_CONFIG_FILE, default_strategy)
+        return {"status": "success", "message": "文件策略配置已重置"}
+
