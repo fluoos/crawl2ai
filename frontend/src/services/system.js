@@ -2,29 +2,50 @@ import request from './request';
 
 /**
  * 获取系统配置
- * @returns {Promise}
+ * @param {string} path 配置路径，可选
+ * @returns {Promise<Object>} 配置信息
  */
-export const getSystemConfig = () => {
-  // 暂时模拟返回结果
-  return Promise.resolve({
-    baseUrl: 'https://api.deepseek.com',
-    model: 'deepseek-chat',
-    apiKey: localStorage.getItem('apiKey') || '',
-    temperature: 0.7,
-    maxTokens: 4000,
-    logLevel: 'info'
-  });
+export const getModelList = async () => {
+  return request.get('/api/system/config/models');
 };
 
-/**
- * 更新系统配置
- * @param {Object} config 配置对象
- * @returns {Promise}
- */
-export const updateSystemConfig = (config) => {
-  // 暂时模拟保存
-  if (config.apiKey) {
-    localStorage.setItem('apiKey', config.apiKey);
-  }
-  return Promise.resolve(true);
-}; 
+export const addModel = async (model) => {
+  return request.post('/api/system/config/models/add', model);
+};
+
+export const updateModel = async (model) => {
+  return request.post(`/api/system/config/models/${model.id}`, model);
+};
+
+export const deleteModel = async (modelId) => {
+  return request.post(`/api/system/config/models/${modelId}/delete`);
+};
+
+export const setDefaultModel = async (modelId) => {
+  return request.post(`/api/system/config/models/${modelId}/default`);
+};
+
+export const getPrompts = async () => {
+  return request.get('/api/system/config/prompts');
+};
+
+export const updatePrompts = async (prompts) => {
+  return request.post('/api/system/config/prompts', prompts);
+};
+
+export const resetPrompts = async () => {
+  return request.post('/api/system/config/prompts/reset');
+};
+
+export const getFileStrategy = async () => {
+  return request.get('/api/system/config/file-strategy');
+};
+
+export const updateFileStrategy = async (strategy) => {
+  return request.post('/api/system/config/file-strategy', strategy);
+};
+
+export const resetFileStrategy = async () => {
+  return request.post('/api/system/config/file-strategy/reset');
+};
+
