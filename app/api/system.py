@@ -25,7 +25,7 @@ class ModelConfig(BaseModel):
     isDefault: bool = False
 
 class PromptsConfig(BaseModel):
-    fileConversion: str = ""
+    data: str = ""
 
 class FileStrategyConfig(BaseModel):
     chunkSize: int = 2000
@@ -90,7 +90,15 @@ async def get_prompts():
 async def update_prompts(prompts: PromptsConfig):
     """更新提示词配置"""
     try:
-        return SystemService.update_prompts(prompts.dict())
+        return SystemService.update_prompts(prompts.data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@router.post("/config/prompts/reset")
+async def reset_prompts():
+    """重置提示词配置"""
+    try:
+        return SystemService.reset_prompts()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

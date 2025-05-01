@@ -347,19 +347,80 @@ class SystemService:
     @staticmethod
     def get_prompts() -> Dict[str, Any]:
         """获取提示词配置"""
-        default_prompts = {
-            "fileConversion": "请将以下文本转换为问答对，确保问题和答案有意义且相互关联。"
+        prompt = SystemService._read_json_file(SystemService.PROMPTS_CONFIG_FILE, {})
+        if prompt.get("data", "") == "":
+            default_prompts = {
+                "data": """
+    Role: 微调数据集生成专家
+    Description: 你是一名微调数据集生成专家，擅长从给定的内容中生成准确的问题答案，确保答案的准确性和相关性。请将用户提供的文本内容拆分成多个问答对, 并给每个问答对添加一个标签，每个问答对都应该是一个完整的知识点。
+
+    要求：
+    1. 答案必须基于给定的内容，保持原文的准确性和专业性
+    2. 答案必须准确，不能胡编乱造
+    3. 仔细分析文本内容，识别所有可能的问题和答案
+    4. 答案必须充分、详细、包含所有必要的信息、适合微调大模型训练使用
+    5. 能够根据问题和内容，智能匹配最合适的标签
+    6. 如果文本中包含多个知识点，请分别提取
+    7. 确保所有重要概念、事实和细节都被纳入问答对中
+    8. 必须以JSON格式返回结果
+
+    示例输入：
+    地球是太阳系的第三颗行星，距离太阳约1.5亿公里。地球表面71%是海洋，29%是陆地。地球自转一周需要24小时，公转一周需要365天。
+
+    示例JSON输出：
+    {
+        "qa_pairs": [
+            {
+                "question": "地球在太阳系中的位置是什么？",
+                "answer": "地球是太阳系的第三颗行星",
+                "label": "地球"
+            },
+            {
+                "question": "地球距离太阳有多远？",
+                "answer": "地球距离太阳约1.5亿公里",
+                "label": "地球"
+            },
+            {
+                "question": "地球表面的海洋和陆地比例是多少？",
+                "answer": "地球表面71%是海洋，29%是陆地",
+                "label": "地球"
+            },
+            {
+                "question": "地球的自转和公转周期分别是多少？",
+                "answer": "地球自转一周需要24小时，公转一周需要365天",
+                "label": "地球"
+            }
+        ]
+    }
+
+    请按照上述JSON格式，将用户提供的文本内容转换为多个问答对。
+    """
         }
+            SystemService._write_json_file(SystemService.PROMPTS_CONFIG_FILE, default_prompts)
+            prompt = default_prompts
         
-        return SystemService._read_json_file(SystemService.PROMPTS_CONFIG_FILE, default_prompts)
+        return prompt
     
     @staticmethod
     def update_prompts(prompts_data: Dict[str, Any]) -> Dict[str, Any]:
         """更新提示词配置"""
+        default_prompts = {
+            "data": prompts_data
+        }
+        print(f"更新提示词配置: {default_prompts}")
         # 保存配置
-        SystemService._write_json_file(SystemService.PROMPTS_CONFIG_FILE, prompts_data)
+        SystemService._write_json_file(SystemService.PROMPTS_CONFIG_FILE, default_prompts)
         
         return {"status": "success", "message": "提示词配置已更新"}
+    
+    @staticmethod
+    def reset_prompts() -> Dict[str, Any]:
+        """重置提示词配置"""
+        default_prompts = {
+            "data": ""
+        }
+        SystemService._write_json_file(SystemService.PROMPTS_CONFIG_FILE, default_prompts)
+        return {"status": "success", "message": "提示词配置已重置"}
     
     @staticmethod
     def get_file_strategy() -> Dict[str, Any]:

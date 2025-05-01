@@ -24,3 +24,24 @@ export const deleteModel = async (modelId) => {
 export const setDefaultModel = async (modelId) => {
   return request.post(`/api/system/config/models/${modelId}/default`);
 };
+
+export const getPrompts = async () => {
+  return request.get('/api/system/config/prompts');
+};
+
+export const updatePrompts = async (prompts) => {
+  return request.post('/api/system/config/prompts', prompts);
+};
+
+export const resetPrompts = async () => {
+  return request.post('/api/system/config/prompts/reset');
+};
+
+export const getFileStrategy = async () => {
+  return request.get('/api/system/config/file-strategy');
+};
+
+export const updateFileStrategy = async (strategy) => {
+  return request.post('/api/system/config/file-strategy', strategy);
+};
+

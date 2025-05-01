@@ -3,7 +3,7 @@
     <a-page-header title="系统配置" subtitle="配置模型API、提示词和文件处理策略" />
     
     <a-card class="card-wrapper">
-      <a-tabs v-model:activeKey="activeTabKey">
+      <a-tabs v-model:activeKey="activeTabKey" @change="loadTabData">
         <!-- 模型配置 Tab -->
         <a-tab-pane key="models" tab="模型配置">
           <div class="tab-content">
@@ -70,7 +70,7 @@
                   name="fileConversion"
                 >
                   <a-textarea
-                    v-model:value="promptsForm.fileConversion"
+                    v-model:value="promptsForm.data"
                     :rows="6"
                     placeholder="输入文件转换提示词"
                   />
@@ -81,7 +81,7 @@
                   <a-button type="primary" html-type="submit" :loading="promptsSubmitLoading">
                     保存提示词
                   </a-button>
-                  <a-button style="margin-left: 10px" @click="resetPrompts">
+                  <a-button style="margin-left: 10px" @click="handleResetPrompts">
                     重置
                   </a-button>
                 </a-form-item>
@@ -248,7 +248,18 @@ import { ref, reactive, onMounted } from 'vue';
 import { message, Modal } from 'ant-design-vue';
 import { useSystemStore } from '../stores/system';
 import { PlusOutlined } from '@ant-design/icons-vue';
-import { getModelList, addModel, updateModel, deleteModel, setDefaultModel } from '../services/system';
+import {
+  getModelList,
+  addModel,
+  updateModel,
+  deleteModel,
+  setDefaultModel,
+  getPrompts,
+  updatePrompts,
+  resetPrompts,
+  getFileStrategy,
+  updateFileStrategy
+} from '../services/system';
 
 const systemStore = useSystemStore();
 
@@ -323,7 +334,7 @@ const modelForm = reactive({
 const promptsLoading = ref(false);
 const promptsSubmitLoading = ref(false);
 const promptsForm = reactive({
-  fileConversion: '',
+  data: '',
 });
 
 // 文件策略表单
@@ -339,11 +350,12 @@ const strategyForm = reactive({
 // 初始化
 onMounted(async () => {
   // 按照当前激活的标签页加载数据
-  loadTabData(activeTabKey.value);
+  loadTabData();
 });
 
 // 切换标签页时加载相应数据
-const loadTabData = (key) => {
+const loadTabData = () => {
+  const key = activeTabKey.value;
   if (key === 'models') {
     fetchModels();
   } else if (key === 'prompts') {
@@ -372,12 +384,11 @@ const fetchModels = async () => {
 const fetchPrompts = async () => {
   promptsLoading.value = true;
   try {
-    const response = await systemStore.fetchPrompts();
-    if (response) {
-      promptsForm.fileConversion = response.fileConversion || '';
+    const response = await getPrompts();
+    if (response && response.data) {
+      promptsForm.data = response.data || '';
     }
   } catch (error) {
-    console.error('获取提示词配置失败:', error);
     message.error('获取提示词配置失败');
   } finally {
     promptsLoading.value = false;
@@ -449,7 +460,6 @@ const submitModelForm = async () => {
       
       if (response && response.status === 'success') {
         message.success(response.message || '添加模型成功');
-        loadTabData(activeTabKey.value);
       } else {
         message.error('添加模型失败');
       }
@@ -458,11 +468,11 @@ const submitModelForm = async () => {
       
       if (response && response.status === 'success') {
         message.success(response.message || '更新模型成功');
-        loadTabData(activeTabKey.value);
       } else {
         message.error('更新模型失败');
       }
     }
+    loadTabData();
     // 关闭对话框并刷新列表
     modelModalVisible.value = false;
   } catch (error) {
@@ -486,11 +496,10 @@ const confirmDeleteModel = (record) => {
         const response = await deleteModel(record.id);
         if (response && response.status === 'success') {
           message.success(response.message || '删除模型成功');
-          loadTabData(activeTabKey.value);
         } else {
           message.error('删除模型失败');
         }
-        loadTabData(activeTabKey.value);
+        loadTabData();
       } catch (error) {
         message.error('删除模型失败');
       }
@@ -504,11 +513,10 @@ const setAsDefault = async (record) => {
     const response = await setDefaultModel(record.id);
     if (response && response.status === 'success') {
       message.success(response.message || '设置默认成功');
-      loadTabData(activeTabKey.value);
     } else {
       message.error('设置默认失败');
     }
-    loadTabData(activeTabKey.value);
+    loadTabData();
   } catch (error) {
     message.error('设置默认失败');
   }
@@ -518,10 +526,14 @@ const setAsDefault = async (record) => {
 const savePrompts = async () => {
   promptsSubmitLoading.value = true;
   try {
-    await systemStore.savePrompts(promptsForm);
-    message.success('提示词配置保存成功');
+    const response = await updatePrompts(promptsForm);
+    if (response && response.status === 'success') {
+      message.success(response.message || '提示词配置保存成功');
+    } else {
+      message.error('设置默认失败');
+    }
+    loadTabData();
   } catch (error) {
-    console.error('保存提示词配置失败:', error);
     message.error('保存提示词配置失败');
   } finally {
     promptsSubmitLoading.value = false;
@@ -529,9 +541,21 @@ const savePrompts = async () => {
 };
 
 // 重置提示词配置
-const resetPrompts = async () => {
-  await fetchPrompts();
-  message.info('提示词配置已重置');
+const handleResetPrompts = async () => {
+  promptsSubmitLoading.value = true;
+  try {
+    const response = await resetPrompts();
+    if (response && response.status === 'success') {
+      message.success(response.message || '提示词配置重置成功');
+    } else {
+      message.error('设置默认失败');
+    }
+    loadTabData();
+  } catch (error) {
+    message.error('重置提示词配置失败');
+  } finally {
+    promptsSubmitLoading.value = false;
+  }
 };
 
 // 保存文件策略配置
