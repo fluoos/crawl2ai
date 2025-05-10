@@ -158,22 +158,18 @@ async def convert_to_dataset(
 ):
     """将Markdown文件转换为数据集"""
     files = data.get("files", [])
-    model = data.get("model", "deepseek")
     output_file = data.get("output_file", "qa_dataset.jsonl")
     
     if not files:
         raise HTTPException(status_code=400, detail="文件列表不能为空")
     try:
         # 启动转换任务
-        result = DatasetService.save_conversion_task_status(files, model, output_file)
-        api_key = None
+        result = DatasetService.save_conversion_task_status(files, output_file)
         # 在后台执行转换任务，传入 api_key
         background_tasks.add_task(
             DatasetService.convert_files_to_dataset_task, 
             files, 
-            model, 
-            output_file,
-            api_key
+            output_file
         )
         
         return result

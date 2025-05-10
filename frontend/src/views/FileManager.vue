@@ -73,14 +73,6 @@
       :confirm-loading="convertLoading"
     >
       <a-form :model="convertForm" :label-col="{ span: 6 }" :wrapper-col="{ span: 16 }">
-        <a-form-item label="使用模型">
-          <a-select v-model:value="convertForm.model">
-            <a-select-option value="deepseek">Deepseek</a-select-option>
-            <a-select-option value="gpt-3.5-turbo">GPT-3.5</a-select-option>
-            <a-select-option value="gemma">Gemma</a-select-option>
-          </a-select>
-        </a-form-item>
-        
         <a-form-item label="输出文件名">
           <a-input disabled v-model:value="convertForm.outputFile" placeholder="qa_dataset.jsonl" />
         </a-form-item>
@@ -133,7 +125,6 @@ const previewContent = ref('');
 // 转换相关
 const convertModalVisible = ref(false);
 const convertForm = reactive({
-  model: 'deepseek',
   outputFile: 'qa_dataset.jsonl',
   files: []
 });
@@ -256,7 +247,6 @@ const confirmConvert = async () => {
   try {
     const response = await convertToDataset(
       convertForm.files,
-      convertForm.model,
       convertForm.outputFile
     );
     

@@ -284,7 +284,7 @@ class DatasetService:
     # Markdown转换相关功能
     
     @staticmethod
-    def save_conversion_task_status(files: List[str], model: str, output_file: str) -> Dict[str, Any]:
+    def save_conversion_task_status(files: List[str], output_file: str) -> Dict[str, Any]:
         """启动文件转换任务"""
         
         # 更新转换状态
@@ -298,11 +298,11 @@ class DatasetService:
         return {"status": "success", "message": "转换任务已开始"}
     
     @staticmethod
-    async def convert_files_to_dataset_task(files: List[str], model: str, output_file: str, api_key: str = None):
+    async def convert_files_to_dataset_task(files: List[str], output_file: str):
         """转换文件到数据集的后台任务"""
         print(f"正在转换 {len(files)} 个文件")
         try:
-            await DatasetService.convert_files_to_dataset(files, model, output_file, api_key)
+            await DatasetService.convert_files_to_dataset(files, output_file)
             conversion_state[output_file]["status"] = "completed"
             conversion_state[output_file]["message"] = "转换任务已完成"
             conversion_state[output_file]["progress"] = conversion_state[output_file]["total"]
@@ -314,9 +314,7 @@ class DatasetService:
     @staticmethod
     async def convert_files_to_dataset(
         files: List[str],
-        model: str = "deepseek",
         output_file: str = "qa_dataset.jsonl",
-        api_key: str = None
     ) -> str:
         """将Markdown文件转换为问答数据集"""
         if not files:
@@ -326,9 +324,22 @@ class DatasetService:
         results = []
         print(f"开始转换 {len(files)} 个文件")
         
-        # 使用默认配置
-        if api_key is None:
-            api_key = settings.DEEPSEEK_API_KEY
+        # 获取默认模型配置
+        models_list = SystemService._read_json_file(SystemService.MODELS_CONFIG_FILE, [])
+        default_model = {}
+        for model_config in models_list:
+            if model_config.get("isDefault", False):
+                default_model = model_config
+                break
+                
+        # 如果找到默认模型，使用其配置
+        model_name = default_model.get("model", "deepseek-chat")
+        base_url = default_model.get("apiEndpoint", "https://api.deepseek.com")
+        api_key = default_model.get("apiKey", settings.DEEPSEEK_API_KEY)
+        print(f"model_name: {model_name}, base_url: {base_url}, api_key: {api_key}", {settings.DEEPSEEK_API_KEY})
+        # 如果API密钥仍为空，返回错误
+        if not api_key:
+            raise ValueError("未配置API密钥，请在系统设置中配置默认模型API密钥或在函数调用时提供API密钥")
         
         # 获取提示词
         prompt = SystemService.get_prompts()
@@ -337,9 +348,6 @@ class DatasetService:
         # 初始化转换状态
         conversion_state[output_file]["progress"] = 0
         
-        # 根据model参数选择实际的API模型名称
-        model_name = "deepseek-chat"  # DeepSeek API使用的实际模型名称
-        
         for i, file_path in enumerate(files):
             try:
                 # 读取文件内容
@@ -347,9 +355,9 @@ class DatasetService:
                     content = f.read()
                 
                 # 调用API
-                client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
+                client = OpenAI(api_key=api_key, base_url=base_url)
                 response = client.chat.completions.create(
-                    model=model_name,  # 使用正确的模型名称
+                    model=model_name,
                     messages=[
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": content}
