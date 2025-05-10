@@ -6,6 +6,7 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime
 import aiohttp
 import asyncio
+from openai import OpenAI
 
 from app.core.config import settings
 from app.services.system_service import SystemService
@@ -283,7 +284,7 @@ class DatasetService:
     # Markdown转换相关功能
     
     @staticmethod
-    def save_conversion_task_status(files: List[str], model: str, output_file: str) -> Dict[str, Any]:
+    def save_conversion_task_status(files: List[str], output_file: str) -> Dict[str, Any]:
         """启动文件转换任务"""
         
         # 更新转换状态
@@ -297,11 +298,11 @@ class DatasetService:
         return {"status": "success", "message": "转换任务已开始"}
     
     @staticmethod
-    async def convert_files_to_dataset_task(files: List[str], model: str, output_file: str, api_key: str = None):
+    async def convert_files_to_dataset_task(files: List[str], output_file: str):
         """转换文件到数据集的后台任务"""
         print(f"正在转换 {len(files)} 个文件")
         try:
-            await DatasetService.convert_files_to_dataset(files, model, output_file, api_key)
+            await DatasetService.convert_files_to_dataset(files, output_file)
             conversion_state[output_file]["status"] = "completed"
             conversion_state[output_file]["message"] = "转换任务已完成"
             conversion_state[output_file]["progress"] = conversion_state[output_file]["total"]
@@ -313,9 +314,7 @@ class DatasetService:
     @staticmethod
     async def convert_files_to_dataset(
         files: List[str],
-        model: str = "deepseek",
         output_file: str = "qa_dataset.jsonl",
-        api_key: str = None
     ) -> str:
         """将Markdown文件转换为问答数据集"""
         if not files:
@@ -325,109 +324,111 @@ class DatasetService:
         results = []
         print(f"开始转换 {len(files)} 个文件")
         
-        # 根据模型选择不同的API和提示词
-        if model == "deepseek":
-            api_url = "https://api.deepseek.com/v1/chat/completions"
-            # 如果没有提供api_key，则使用默认配置
-            if api_key is None:
-                api_key = settings.DEEPSEEK_API_KEY
-            prompt = SystemService.get_prompts()
-            system_prompt = prompt.get("data", "")
-        else:
-            raise ValueError(f"不支持的模型: {model}")
+        # 获取默认模型配置
+        models_list = SystemService._read_json_file(SystemService.MODELS_CONFIG_FILE, [])
+        default_model = {}
+        for model_config in models_list:
+            if model_config.get("isDefault", False):
+                default_model = model_config
+                break
+                
+        # 如果找到默认模型，使用其配置
+        model_name = default_model.get("model", "deepseek-chat")
+        base_url = default_model.get("apiEndpoint", "https://api.deepseek.com")
+        api_key = default_model.get("apiKey", settings.DEEPSEEK_API_KEY)
+        print(f"model_name: {model_name}, base_url: {base_url}, api_key: {api_key}", {settings.DEEPSEEK_API_KEY})
+        # 如果API密钥仍为空，返回错误
+        if not api_key:
+            raise ValueError("未配置API密钥，请在系统设置中配置默认模型API密钥或在函数调用时提供API密钥")
+        
+        # 获取提示词
+        prompt = SystemService.get_prompts()
+        system_prompt = prompt.get("data", "")
         
         # 初始化转换状态
         conversion_state[output_file]["progress"] = 0
         
-        async with aiohttp.ClientSession() as session:
-            for i, file_path in enumerate(files):
+        for i, file_path in enumerate(files):
+            try:
+                # 读取文件内容
+                with open(file_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                
+                # 调用API
+                client = OpenAI(api_key=api_key, base_url=base_url)
+                response = client.chat.completions.create(
+                    model=model_name,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": content}
+                    ],
+                    stream=False
+                )
+                generated_text = response.choices[0].message.content
+                
+                # 解析JSON响应
                 try:
-                    # 读取文件内容
-                    with open(file_path, "r", encoding="utf-8") as f:
-                        content = f.read()
-                    
-                    # 构建API请求
-                    payload = {
-                        "model": "deepseek-chat",
-                        "messages": [
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": content}
-                        ],
-                        "temperature": 0.7,
-                        "response_format": {"type": "json_object"}
-                    }
-                    
-                    headers = {
-                        "Content-Type": "application/json",
-                        "Authorization": f"Bearer {api_key}"
-                    }
-                    
-                    # 发送API请求
-                    async with session.post(api_url, json=payload, headers=headers) as response:
-                        if response.status != 200:
-                            error_text = await response.text()
-                            logging.error(f"API请求失败: {error_text}")
-                            continue
+                    # 去除可能的Markdown代码块标记
+                    if generated_text.startswith("```"):
+                        # 查找第一个和最后一个```
+                        first_ticks = generated_text.find("\n", generated_text.find("```"))
+                        last_ticks = generated_text.rfind("```")
+                        if first_ticks != -1 and last_ticks != -1:
+                            # 提取```之间的内容
+                            generated_text = generated_text[first_ticks+1:last_ticks].strip()
                         
-                        response_data = await response.json()
-                        generated_text = response_data["choices"][0]["message"]["content"]
-                        
-                        # 解析JSON响应
-                        try:
-                            result = json.loads(generated_text)
-                            
-                            # 检查和处理qa_pairs字段
-                            if 'qa_pairs' in result and isinstance(result['qa_pairs'], list):
-                                for qa_pair in result['qa_pairs']:
-                                    if isinstance(qa_pair, dict) and "question" in qa_pair and "answer" in qa_pair:
-                                        qa_pair["source"] = file_path
-                                        results.append(qa_pair)
-                            else:
-                                logging.warning(f"API返回的JSON缺少'qa_pairs'字段或格式不符合预期")
-                        except json.JSONDecodeError as e:
-                            logging.error(f"JSON解析错误: {str(e)}, 内容: {generated_text}")
-                            
-                            # 尝试基本的问答提取
-                            questions = []
-                            answers = []
-                            current_answer = ""
-                            
-                            for line in generated_text.split("\n"):
-                                if line.startswith("问题") or line.startswith("Q:"):
-                                    if current_answer and questions:
-                                        answers.append(current_answer.strip())
-                                        current_answer = ""
-                                    questions.append(line.split(":", 1)[1].strip())
-                                elif line.startswith("答案") or line.startswith("A:"):
-                                    current_answer = line.split(":", 1)[1].strip()
-                                elif current_answer:
-                                    current_answer += " " + line.strip()
-                            
-                            if current_answer:
+                    result = json.loads(generated_text)
+                    
+                    # 处理qa_pairs字段
+                    if 'qa_pairs' in result and isinstance(result['qa_pairs'], list):
+                        for qa_pair in result['qa_pairs']:
+                            if isinstance(qa_pair, dict) and "question" in qa_pair and "answer" in qa_pair:
+                                qa_pair["source"] = file_path
+                                results.append(qa_pair)
+                    else:
+                        logging.warning(f"API返回的JSON缺少'qa_pairs'字段或格式不符合预期")
+                except json.JSONDecodeError as e:
+                    logging.error(f"JSON解析错误: {str(e)}, 内容: {generated_text}")
+                    
+                    # 尝试基本的问答提取
+                    questions = []
+                    answers = []
+                    current_answer = ""
+                    
+                    for line in generated_text.split("\n"):
+                        if line.startswith("问题") or line.startswith("Q:"):
+                            if current_answer and questions:
                                 answers.append(current_answer.strip())
-                            
-                            # 将提取的问答对添加到结果中
-                            for i in range(min(len(questions), len(answers))):
-                                results.append({
-                                    "question": questions[i],
-                                    "answer": answers[i],
-                                    "source": file_path,
-                                    "label": "未分类"
-                                })
+                                current_answer = ""
+                            questions.append(line.split(":", 1)[1].strip())
+                        elif line.startswith("答案") or line.startswith("A:"):
+                            current_answer = line.split(":", 1)[1].strip()
+                        elif current_answer:
+                            current_answer += " " + line.strip()
                     
-                    # 更新进度
-                    conversion_state[output_file]["progress"] = i + 1
+                    if current_answer:
+                        answers.append(current_answer.strip())
                     
-                    # 避免API速率限制
-                    await asyncio.sleep(1)
-                    
-                except Exception as e:
-                    logging.error(f"处理文件 {file_path} 时出错: {str(e)}")
+                    # 将提取的问答对添加到结果中
+                    for i in range(min(len(questions), len(answers))):
+                        results.append({
+                            "question": questions[i],
+                            "answer": answers[i],
+                            "source": file_path,
+                            "label": "未分类"
+                        })
+                
+                # 更新进度
+                conversion_state[output_file]["progress"] = i + 1
+                
+                # 避免API速率限制
+                await asyncio.sleep(1)
+                
+            except Exception as e:
+                logging.error(f"处理文件 {file_path} 时出错: {str(e)}")
         
-        # 关键修改：使用追加模式写入文件
+        # 确保输出目录存在并以追加模式写入文件
         os.makedirs("output", exist_ok=True)
-        
-        # 使用追加模式打开文件
         with open(output_path, "a", encoding="utf-8") as f:
             for item in results:
                 f.write(json.dumps(item, ensure_ascii=False) + "\n")
