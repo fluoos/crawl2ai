@@ -162,6 +162,17 @@ class SystemService:
                 "isDefault": False,
                 "apiKey": "",
                 "model": "qwen-max-latest"
+            },
+            {
+                "id": "d7a4b3f3-a8c8-4e51-8a2e-7008321753fd",
+                "name": "kimi",
+                "model": "moonshot-v1-32k",
+                "apiEndpoint": "https://api.moonshot.cn/v1",
+                "apiKey": "",
+                "type": "chat",
+                "temperature": 0.7,
+                "maxTokens": 4000,
+                "isDefault": False
             }
         ]
     
