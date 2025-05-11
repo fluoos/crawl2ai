@@ -7,11 +7,11 @@ from app.core.config import settings
 class SystemService:
     """系统服务类，处理所有与系统配置相关的业务逻辑"""
     
-    CONFIG_DIR = "output/config"
-    SYSTEM_CONFIG_FILE = "system.json"
-    MODELS_CONFIG_FILE = "models.json"
-    PROMPTS_CONFIG_FILE = "prompts.json"
-    FILE_STRATEGY_CONFIG_FILE = "file_strategy.json"
+    CONFIG_DIR = settings.SYSTEM_CONFIG_DIR
+    SYSTEM_CONFIG_FILE = settings.SYSTEM_CONFIG_FILE
+    MODELS_CONFIG_FILE = settings.MODELS_CONFIG_FILE
+    PROMPTS_CONFIG_FILE = settings.PROMPTS_CONFIG_FILE
+    FILE_STRATEGY_CONFIG_FILE = settings.FILE_STRATEGY_CONFIG_FILE
     
     @staticmethod
     def _ensure_config_dir():
@@ -438,10 +438,10 @@ class SystemService:
         """获取文件策略配置"""
         default_strategy = {
             "data": {
-                "chunkSize": 2000,
-                "overlapSize": 200,
-                "preserveMarkdown": True,
-                "smartChunking": True
+                "chunkSize": settings.DEFAULT_CHUNK_SIZE,
+                "overlapSize": settings.DEFAULT_OVERLAP_SIZE,
+                "preserveMarkdown": settings.DEFAULT_PRESERVE_MARKDOWN,
+                "smartChunking": settings.DEFAULT_SMART_CHUNKING
             }
         }
         strategy = SystemService._read_json_file(SystemService.FILE_STRATEGY_CONFIG_FILE, {})

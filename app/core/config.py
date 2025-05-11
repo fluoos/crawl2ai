@@ -1,7 +1,6 @@
 import os
 from pydantic_settings import BaseSettings
-from typing import Optional, List, Dict, Any
-from pydantic import BaseModel
+from typing import List, Dict, Any
 
 class Settings(BaseSettings):
     # API密钥配置
@@ -19,22 +18,22 @@ class Settings(BaseSettings):
     SUPPORTED_STYLES: List[str] = ["Alpaca", "ShareGPT", "Custom"]
     
     # 爬虫配置
-    DEFAULT_CRAWLER_CONFIG: Dict[str, Any] = {
-        "max_depth": 3,
-        "max_pages": 100,
-        "timeout": 30,
-        "user_agent": "Mozilla/5.0 (compatible; DatasetCrawlerBot/1.0;)",
-    }
+    DEFAULT_MAX_DEPTH: int = 3
+    DEFAULT_MAX_PAGES: int = 100
+    DEFAULT_CRAWL_STRATEGY: str = "bfs"
     
-    # 转换配置
-    DEFAULT_CONVERTER_CONFIG: Dict[str, Any] = {
-        "model": "deepseek-chat",
-        "temperature": 0.7,
-        "max_tokens": 4000,
-    }
+    # 系统服务配置
+    SYSTEM_CONFIG_DIR: str = "output/config"
+    SYSTEM_CONFIG_FILE: str = "system.json"
+    MODELS_CONFIG_FILE: str = "models.json"
+    PROMPTS_CONFIG_FILE: str = "prompts.json"
+    FILE_STRATEGY_CONFIG_FILE: str = "file_strategy.json"
     
-    # 前端环境变量 - 可以保留但非必需
-    VITE_API_BASE_URL: str = "http://localhost:8000"
+    # 文件处理默认配置
+    DEFAULT_CHUNK_SIZE: int = 2000
+    DEFAULT_OVERLAP_SIZE: int = 200
+    DEFAULT_PRESERVE_MARKDOWN: bool = True
+    DEFAULT_SMART_CHUNKING: bool = True
     
     # 使用Pydantic v2配置语法
     model_config = {
@@ -48,4 +47,11 @@ settings = Settings()
 
 # 确保必要的目录存在
 for dir_path in [settings.OUTPUT_DIR, settings.EXPORT_DIR, settings.UPLOAD_DIR, settings.CONFIG_DIR]:
-    os.makedirs(dir_path, exist_ok=True) 
+    os.makedirs(dir_path, exist_ok=True)
+
+# 确保导出子目录存在
+for style in [s.lower() for s in settings.SUPPORTED_STYLES]:
+    os.makedirs(os.path.join(settings.EXPORT_DIR, style), exist_ok=True)
+
+# 确保系统配置目录存在
+os.makedirs(settings.SYSTEM_CONFIG_DIR, exist_ok=True) 

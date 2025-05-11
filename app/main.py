@@ -1,17 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-import os
 
 from app.api import crawler, files, system, dataset
-
-# 确保必要的目录存在
-for dir_path in ["output", "upload", "export", "config"]:
-    os.makedirs(dir_path, exist_ok=True)
-
-# 确保导出子目录存在
-for style in ["alpaca", "sharegpt", "custom"]:
-    os.makedirs(os.path.join("export", style), exist_ok=True)
+from app.core.config import settings
 
 app = FastAPI(
     title="数据集生成与大模型微调工具",
@@ -35,8 +27,8 @@ app.include_router(dataset.router, prefix="/api/dataset", tags=["数据集管理
 app.include_router(system.router, prefix="/api/system", tags=["系统配置"])
 
 # 挂载静态文件
-app.mount("/output", StaticFiles(directory="output"), name="output")
-app.mount("/export", StaticFiles(directory="export"), name="export")
+app.mount("/output", StaticFiles(directory=settings.OUTPUT_DIR), name="output")
+app.mount("/export", StaticFiles(directory=settings.EXPORT_DIR), name="export")
 
 @app.get("/")
 async def root():
