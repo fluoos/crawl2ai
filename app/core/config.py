@@ -11,7 +11,6 @@ class Settings(BaseSettings):
     OUTPUT_DIR: str = "output"
     EXPORT_DIR: str = "export"
     UPLOAD_DIR: str = "upload"
-    CONFIG_DIR: str = "config"
     
     # 导出配置
     SUPPORTED_FORMATS: List[str] = ["jsonl", "json"]
@@ -46,7 +45,7 @@ class Settings(BaseSettings):
 settings = Settings()
 
 # 确保必要的目录存在
-for dir_path in [settings.OUTPUT_DIR, settings.EXPORT_DIR, settings.UPLOAD_DIR, settings.CONFIG_DIR]:
+for dir_path in [settings.OUTPUT_DIR, settings.EXPORT_DIR, settings.UPLOAD_DIR]:
     os.makedirs(dir_path, exist_ok=True)
 
 # 确保导出子目录存在
