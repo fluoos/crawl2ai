@@ -613,11 +613,11 @@ class DatasetService:
             }
         
         # 备份原始文件
-        backup_path = os.path.join(settings.OUTPUT_DIR, f"{input_file}.bak.{datetime.now().strftime('%Y%m%d%H%M%S')}")
-        try:
-            shutil.copy2(file_path, backup_path)
-        except Exception as e:
-            logging.warning(f"备份原始文件失败: {str(e)}")
+        # backup_path = os.path.join(settings.OUTPUT_DIR, f"{input_file}.bak.{datetime.now().strftime('%Y%m%d%H%M%S')}")
+        # try:
+        #     shutil.copy2(file_path, backup_path)
+        # except Exception as e:
+        #     logging.warning(f"备份原始文件失败: {str(e)}")
         
         # 为没有id的数据项添加id
         current_id = 1
