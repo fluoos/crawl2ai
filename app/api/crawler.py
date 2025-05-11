@@ -4,6 +4,7 @@ from typing import List, Optional
 from app.schemas.crawler import CrawlerRequest, CrawlerResponse, UrlToMarkdownRequest, UrlToMarkdownResponse
 from app.core.deps import get_api_key
 from app.services.crawler_service import CrawlerService
+from app.core.config import settings
 
 router = APIRouter()
 

@@ -1,13 +1,15 @@
 from pydantic import BaseModel, HttpUrl, Field
 from typing import List, Optional, Literal, Dict, Any, Union
+from app.core.config import settings
+from app.utils.path_utils import join_paths
 
 class CrawlerRequest(BaseModel):
     url: str
-    max_depth: int = Field(3, ge=1, le=10)
-    max_pages: int = Field(100, ge=1, le=5000)
+    max_depth: int = Field(settings.DEFAULT_MAX_DEPTH, ge=1, le=10)
+    max_pages: int = Field(settings.DEFAULT_MAX_PAGES, ge=1, le=5000)
     include_patterns: Optional[List[str]] = None
     exclude_patterns: Optional[List[str]] = None
-    crawl_strategy: Literal["bfs", "dfs"] = "bfs"
+    crawl_strategy: Literal["bfs", "dfs"] = settings.DEFAULT_CRAWL_STRATEGY
     force_refresh: bool = False
     
 class UrlItem(BaseModel):
@@ -24,7 +26,7 @@ class CrawlerResponse(BaseModel):
     
 class UrlToMarkdownRequest(BaseModel):
     urls: List[str]
-    output_dir: Optional[str] = "output"
+    output_dir: Optional[str] = settings.OUTPUT_DIR
     included_selector: Optional[str] = None
     excluded_selector: Optional[str] = None
     

@@ -3,37 +3,19 @@ import json
 import uuid
 from typing import Dict, Any, List
 from app.core.config import settings
+from app.utils.path_utils import join_paths, get_config_path
 
 class SystemService:
     """系统服务类，处理所有与系统配置相关的业务逻辑"""
     
-    CONFIG_DIR = "output/config"
-    SYSTEM_CONFIG_FILE = "system.json"
-    MODELS_CONFIG_FILE = "models.json"
-    PROMPTS_CONFIG_FILE = "prompts.json"
-    FILE_STRATEGY_CONFIG_FILE = "file_strategy.json"
-    
-    @staticmethod
-    def _ensure_config_dir():
-        """确保配置目录存在"""
-        try:
-            dir_path = SystemService.CONFIG_DIR
-            print(f"确保目录存在: {dir_path}")
-            os.makedirs(dir_path, exist_ok=True)
-            print(f"目录检查/创建成功: {dir_path}")
-        except Exception as e:
-            print(f"创建目录 {SystemService.CONFIG_DIR} 时出错: {str(e)}")
-            raise e
-    
-    @staticmethod
-    def _get_file_path(filename):
-        """获取配置文件路径"""
-        return os.path.join(SystemService.CONFIG_DIR, filename)
-    
+    MODELS_CONFIG_FILE = settings.MODELS_CONFIG_FILE
+    PROMPTS_CONFIG_FILE = settings.PROMPTS_CONFIG_FILE
+    FILE_STRATEGY_CONFIG_FILE = settings.FILE_STRATEGY_CONFIG_FILE
+
     @staticmethod
     def _read_json_file(filename, default_value=None):
         """读取JSON文件，如果文件不存在则返回默认值"""
-        file_path = SystemService._get_file_path(filename)
+        file_path = get_config_path(filename)
         print(f"尝试读取文件: {file_path}")
         try:
             if os.path.exists(file_path):
@@ -50,8 +32,7 @@ class SystemService:
     def _write_json_file(filename, data):
         """写入JSON文件"""
         try:
-            SystemService._ensure_config_dir()
-            file_path = SystemService._get_file_path(filename)
+            file_path = get_config_path(filename)
             print(f"尝试写入文件: {file_path}")
             with open(file_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
@@ -438,10 +419,10 @@ class SystemService:
         """获取文件策略配置"""
         default_strategy = {
             "data": {
-                "chunkSize": 2000,
-                "overlapSize": 200,
-                "preserveMarkdown": True,
-                "smartChunking": True
+                "chunkSize": settings.DEFAULT_CHUNK_SIZE,
+                "overlapSize": settings.DEFAULT_OVERLAP_SIZE,
+                "preserveMarkdown": settings.DEFAULT_PRESERVE_MARKDOWN,
+                "smartChunking": settings.DEFAULT_SMART_CHUNKING
             }
         }
         strategy = SystemService._read_json_file(SystemService.FILE_STRATEGY_CONFIG_FILE, {})

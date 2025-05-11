@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Path
 from typing import Dict, Any, List, Optional
 from pydantic import BaseModel, Field
 from app.services.system_service import SystemService
+from app.core.config import settings
 
 router = APIRouter()
 
@@ -28,10 +29,10 @@ class PromptsConfig(BaseModel):
     data: str = ""
 
 class FileStrategyConfig(BaseModel):
-    chunkSize: int = 2000
-    overlapSize: int = 200
-    preserveMarkdown: bool = True
-    smartChunking: bool = True
+    chunkSize: int = settings.DEFAULT_CHUNK_SIZE
+    overlapSize: int = settings.DEFAULT_OVERLAP_SIZE
+    preserveMarkdown: bool = settings.DEFAULT_PRESERVE_MARKDOWN
+    smartChunking: bool = settings.DEFAULT_SMART_CHUNKING
 
 @router.get("/config/models")
 async def get_models():
