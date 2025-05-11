@@ -3,6 +3,7 @@
     <a-layout-header class="header">
       <div class="logo">Crawl To AI</div>
       <a-menu
+        v-if="!isProjectPage"
         v-model:selectedKeys="selectedKeys"
         theme="dark"
         mode="horizontal"
@@ -44,12 +45,16 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue';
+import { ref, watch, computed } from 'vue';
 import { useRoute } from 'vue-router';
 import { LinkOutlined, FileOutlined, DatabaseOutlined, SettingOutlined } from '@ant-design/icons-vue';
 
 const route = useRoute();
 const selectedKeys = ref([route.path.split('/')[1] || 'links']);
+
+const isProjectPage = computed(() => {
+  return route.path.startsWith('/projects');
+});
 
 watch(() => route.path, (newPath) => {
   selectedKeys.value = [newPath.split('/')[1] || 'links'];

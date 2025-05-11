@@ -3,7 +3,13 @@ import { createRouter, createWebHistory } from 'vue-router';
 const routes = [
   {
     path: '/',
-    redirect: '/links'
+    redirect: '/projects'
+  },
+  {
+    path: '/projects',
+    name: 'projectManagement',
+    component: () => import('../views/ProjectManager.vue'),
+    meta: { title: '项目管理' }
   },
   {
     path: '/links',
