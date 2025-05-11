@@ -41,7 +41,7 @@
                 <div class="project-name">
                   {{ project.name }}
                 </div>
-                <a-button type="primary" ghost size="small" @click="navigateToProject(project.id)">进入项目</a-button>
+                <a-button type="primary" ghost size="small" @click="navigateToProject(project)">进入项目</a-button>
               </div>
               <div class="project-desc">{{ project.description || '暂无描述' }}</div>
               <div class="project-footer">
@@ -297,9 +297,13 @@
     });
   };
   
-  // 导航到项目详情页
-  const navigateToProject = (projectId) => {
-    router.push(`/project/${projectId}`);
+  const navigateToProject = (project) => {
+    // 进入项目前，先把当前项目的信息存储到localstorage中
+    localStorage.setItem('currentProject', JSON.stringify(project));
+    router.push({
+      path: '/links',
+      params: { projectId: project.id }
+    });
   };
   </script>
   
