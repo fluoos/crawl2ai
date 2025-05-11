@@ -4,6 +4,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.api import crawler, files, system, dataset
 from app.core.config import settings
+from app.utils.path_utils import ensure_dir
 
 app = FastAPI(
     title="数据集生成与大模型微调工具",

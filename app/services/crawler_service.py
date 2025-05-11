@@ -9,6 +9,11 @@ from datetime import datetime
 from urllib.parse import urlparse
 from typing import List, Optional, Dict, Any, Set
 from app.core.config import settings
+from app.utils.path_utils import (
+    join_paths, 
+    get_output_path,
+    ensure_dir
+)
 
 # 导入crawl4ai库
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, BrowserConfig, MemoryAdaptiveDispatcher, CrawlerMonitor, DisplayMode
@@ -46,7 +51,7 @@ class CrawlerService:
             process.daemon = True
             process.start()
             # 将进程ID保存到文件
-            with open(os.path.join(settings.OUTPUT_DIR, "crawler_process.json"), "w") as f:
+            with open(get_output_path("crawler_process.json"), "w") as f:
                 json.dump({"pid": process.pid, "start_time": time.time()}, f)
             
             print(f"后台任务创建成功，进程ID: {process.pid}")
@@ -62,10 +67,10 @@ class CrawlerService:
     def stop_crawl() -> Dict[str, Any]:
         """强制停止当前运行的爬虫任务"""
         # 更新爬虫状态
-        with open(os.path.join(settings.OUTPUT_DIR, "crawler_status.json"), "w", encoding="utf-8") as f:
+        with open(get_output_path("crawler_status.json"), "w", encoding="utf-8") as f:
             json.dump({"status": "stopped", "message": "爬虫任务已手动停止"}, f)
 
-        process_info_file = os.path.join(settings.OUTPUT_DIR, "crawler_process.json")
+        process_info_file = get_output_path("crawler_process.json")
         # 检查是否有记录的爬虫进程
         if not os.path.exists(process_info_file):
             
@@ -102,7 +107,7 @@ class CrawlerService:
             }
         
         # 创建停止标志文件
-        with open(os.path.join(settings.OUTPUT_DIR, "stop_crawler.flag"), "w") as f:
+        with open(get_output_path("stop_crawler.flag"), "w") as f:
             f.write("stop")
         
         # 尝试终止进程
@@ -134,8 +139,8 @@ class CrawlerService:
     def get_crawl_status() -> Dict[str, Any]:
         """检查爬虫状态并获取爬取的URL"""
         # 文件路径
-        status_file = os.path.join(settings.OUTPUT_DIR, "crawler_status.json")
-        urls_file = os.path.join(settings.OUTPUT_DIR, "crawled_urls.json")
+        status_file = get_output_path("crawler_status.json")
+        urls_file = get_output_path("crawled_urls.json")
         
         # 默认状态
         status = "idle"
@@ -188,9 +193,9 @@ class CrawlerService:
         
         try:
             # 确保输出目录存在
-            os.makedirs(settings.OUTPUT_DIR, exist_ok=True)
+            ensure_dir(settings.OUTPUT_DIR)
             # JSON文件路径
-            crawled_urls_path = os.path.join(settings.OUTPUT_DIR, "crawled_urls.json")
+            crawled_urls_path = get_output_path("crawled_urls.json")
             deleted_count = 0
             
             # 检查文件是否存在
@@ -278,7 +283,7 @@ class CrawlerService:
             process.start()
             
             # 将进程ID保存到文件
-            with open(os.path.join(settings.OUTPUT_DIR, "convert_process.json"), "w") as f:
+            with open(get_output_path("convert_process.json"), "w") as f:
                 json.dump({"pid": process.pid, "start_time": time.time()}, f)
             
             print(f"转换任务已开始，进程ID: {process.pid}")
@@ -303,8 +308,8 @@ class CrawlerService:
     ):
         """在独立进程中运行爬虫任务"""
         # 多进程环境下需要设置共享状态（使用文件）
-        os.makedirs(settings.OUTPUT_DIR, exist_ok=True)
-        with open(os.path.join(settings.OUTPUT_DIR, "crawler_status.json"), "w", encoding="utf-8") as f:
+        ensure_dir(settings.OUTPUT_DIR)
+        with open(get_output_path("crawler_status.json"), "w", encoding="utf-8") as f:
             json.dump({"status": "running", "message": f"爬虫任务正在进行中（{crawl_strategy}策略）..."}, f)
         
         try:
@@ -320,7 +325,7 @@ class CrawlerService:
             ))
         except Exception as e:
             # 记录错误
-            with open(os.path.join(settings.OUTPUT_DIR, "crawler_status.json"), "w", encoding="utf-8") as f:
+            with open(get_output_path("crawler_status.json"), "w", encoding="utf-8") as f:
                 json.dump({"status": "failed", "message": f"爬虫任务失败: {str(e)}"}, f)
             print(f"爬虫任务失败: {str(e)}")
 
@@ -333,8 +338,8 @@ class CrawlerService:
     ):
         """在独立进程中运行URL到Markdown的转换任务"""
         # 记录转换任务开始
-        os.makedirs(settings.OUTPUT_DIR, exist_ok=True)
-        with open(os.path.join(settings.OUTPUT_DIR, "convert_status.json"), "w", encoding="utf-8") as f:
+        ensure_dir(settings.OUTPUT_DIR)
+        with open(get_output_path("convert_status.json"), "w", encoding="utf-8") as f:
             json.dump({"status": "running", "message": f"转换任务正在进行中，共{len(urls)}个URL..."}, f)
         
         try:
@@ -347,11 +352,11 @@ class CrawlerService:
             ))
             
             # 更新状态为已完成
-            with open(os.path.join(settings.OUTPUT_DIR, "convert_status.json"), "w", encoding="utf-8") as f:
+            with open(get_output_path("convert_status.json"), "w", encoding="utf-8") as f:
                 json.dump({"status": "completed", "message": "转换任务已完成"}, f)
         except Exception as e:
             # 记录错误
-            with open(os.path.join(settings.OUTPUT_DIR, "convert_status.json"), "w", encoding="utf-8") as f:
+            with open(get_output_path("convert_status.json"), "w", encoding="utf-8") as f:
                 json.dump({"status": "failed", "message": f"转换任务失败: {str(e)}"}, f)
             print(f"转换任务失败: {str(e)}")
 
@@ -406,9 +411,9 @@ class CrawlerService:
         """
         print(f"准备开始爬取URL: {start_url}")
         # 确保输出目录存在
-        os.makedirs(settings.OUTPUT_DIR, exist_ok=True)
+        ensure_dir(settings.OUTPUT_DIR)
         # 保存更详细的JSON格式
-        output_json_file = os.path.join(settings.OUTPUT_DIR, "crawled_urls.json")
+        output_json_file = get_output_path("crawled_urls.json")
         # 初始化空列表用于存储结果
         crawled_data = []
         # 使用集合来跟踪已爬取的URL，便于快速查找
@@ -506,7 +511,7 @@ class CrawlerService:
         
         print(f"爬取完成，共找到 {len(crawled_urls)} 个URL")
         # 更新状态
-        with open(os.path.join(settings.OUTPUT_DIR, "crawler_status.json"), "w", encoding="utf-8") as f:
+        with open(get_output_path("crawler_status.json"), "w", encoding="utf-8") as f:
             json.dump({"status": "completed", "message": "爬虫任务已完成"}, f)
         return crawled_urls
 
@@ -518,7 +523,7 @@ class CrawlerService:
         excluded_selector: Optional[str] = None
     ) -> List[str]:
         """将URL列表转换为Markdown文件"""
-        os.makedirs(output_dir, exist_ok=True)
+        ensure_dir(output_dir)
 
         print(f"读取到 {len(urls)} 个需要转换的新URL")
         
@@ -562,7 +567,7 @@ class CrawlerService:
                 if result.success and result.markdown and result.markdown.strip():
                     # 生成文件名
                     filename = CrawlerService.url_to_filename(result.url)
-                    filepath = os.path.join(output_dir, filename)
+                    filepath = join_paths(output_dir, filename)
                     
                     # 保存markdown内容
                     with open(filepath, 'w', encoding='utf-8') as f:
@@ -596,7 +601,7 @@ class CrawlerService:
         返回:
         - bool: 是否成功更新
         """
-        crawled_urls_path = os.path.join(settings.OUTPUT_DIR, "crawled_urls.json")
+        crawled_urls_path = get_output_path("crawled_urls.json")
         updated = False
         
         # 读取现有的JSON文件
@@ -635,7 +640,7 @@ class CrawlerService:
         返回:
         - bool: 是否成功更新
         """
-        registry_path = os.path.join(settings.OUTPUT_DIR, "markdown_manager.json")
+        registry_path = get_output_path("markdown_manager.json")
         relative_path = filepath.replace('\\', '/')  # 确保路径格式一致
         
         # 创建基本文件记录
@@ -651,7 +656,7 @@ class CrawlerService:
             file_record["title"] = title
         
         # 确保输出目录存在
-        os.makedirs(settings.OUTPUT_DIR, exist_ok=True)
+        ensure_dir(settings.OUTPUT_DIR)
         
         try:
             # 检查文件是否存在

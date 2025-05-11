@@ -1,6 +1,7 @@
 from pydantic import BaseModel, HttpUrl, Field
 from typing import List, Optional, Literal, Dict, Any, Union
 from app.core.config import settings
+from app.utils.path_utils import join_paths
 
 class CrawlerRequest(BaseModel):
     url: str
@@ -25,7 +26,7 @@ class CrawlerResponse(BaseModel):
     
 class UrlToMarkdownRequest(BaseModel):
     urls: List[str]
-    output_dir: Optional[str] = "output"
+    output_dir: Optional[str] = settings.OUTPUT_DIR
     included_selector: Optional[str] = None
     excluded_selector: Optional[str] = None
     
