@@ -101,9 +101,6 @@ watch(() => route.path, (newPath) => {
     // 判断本地storage中是否存在当前项目信息，如果不存在，则跳转到项目管理页
     const projectStr = localStorage.getItem('currentProject');
     currentProject.value = projectStr ? JSON.parse(projectStr) : null;
-    if (!currentProject.value) {
-      router.push('/projects');
-    }
   }
 });
 </script>
