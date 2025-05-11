@@ -325,6 +325,7 @@
     cursor: pointer;
     min-width: 320px;
     max-width: 520px;
+    min-height: 200px;
   }
   
   .project-id {
