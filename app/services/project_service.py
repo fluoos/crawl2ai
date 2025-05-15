@@ -92,6 +92,9 @@ class ProjectService:
             except json.JSONDecodeError:
                 projects = []
         
+        for project in projects:
+            project["dataset_count"] = DatasetService.get_project_dataset_count(project["id"])
+        
         return {"status": "success", "message": "项目创建成功", "data": [ProjectResponse(**p) for p in projects] }
     
     @staticmethod

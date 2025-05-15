@@ -114,6 +114,12 @@ class DatasetService:
         return examples
     
     @staticmethod
+    def get_project_dataset_count(project_id: Optional[str] = None) -> int:
+        """获取项目数据集数量"""
+        input_file = DatasetService.get_project_dataset_path(project_id)
+        return len(DatasetService.read_jsonl_file(input_file))
+    
+    @staticmethod
     def get_stats(project_id: Optional[str] = None) -> Dict[str, Any]:
         """获取数据集统计信息"""
         # 根据project_id获取数据集路径

@@ -47,7 +47,7 @@
               <div class="project-footer">
                 <div class="project-stats">
                   <a-tag color="blue">
-                    <DatabaseOutlined /> 数据集: {{ project.dataset_count }}
+                    <DatabaseOutlined /> 数据: {{ project.dataset_count }}
                   </a-tag>
                 </div>
                 <div class="project-date">创建于: {{ formatDate(project.created_at) }}</div>
