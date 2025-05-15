@@ -23,24 +23,6 @@ class DatasetService:
     """数据集服务类，处理所有与数据集相关的业务逻辑"""
     
     @staticmethod
-    def ensure_output_file_exists():
-        """确保输出目录和文件存在"""
-        os.makedirs(settings.OUTPUT_DIR, exist_ok=True)
-        
-        # 检查qa_dataset.jsonl是否存在，如果不存在则创建一个示例文件
-        qa_file = os.path.join(settings.OUTPUT_DIR, "qa_dataset.jsonl")
-        if not os.path.exists(qa_file):
-            with open(qa_file, "w", encoding="utf-8") as f:
-                # 写入几条示例数据
-                f.write('{"question": "什么是大模型?", "answer": "大模型是指参数量巨大的人工智能模型，如GPT等。", "label": "AI"}\n')
-                f.write('{"question": "如何训练大模型?", "answer": "训练大模型需要大量数据和计算资源，通常采用分布式训练方法。", "label": "训练"}\n')
-                f.write('{"question": "数据集如何准备?", "answer": "数据集准备需要收集、清洗、标注和验证数据，确保数据质量和多样性。", "label": "数据"}\n')
-        
-        # 确保导出目录存在
-        for style in DATASET_STYLES:
-            os.makedirs(os.path.join(settings.EXPORT_DIR, style.lower()), exist_ok=True)
-    
-    @staticmethod
     def get_project_dataset_path(project_id: Optional[str] = None) -> str:
         """
         获取数据集文件路径

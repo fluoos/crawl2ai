@@ -30,7 +30,7 @@
           </router-link>
         </a-menu-item>
       </a-menu>
-      <div v-if="currentProject" class="project-info">
+      <div v-if="currentProject && !isProjectPage" class="project-info">
         <a-tooltip placement="bottom" title="返回项目管理">
           <a-button 
             type="primary" 

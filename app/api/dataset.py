@@ -15,9 +15,6 @@ from app.services.dataset_service import DatasetService, EXPORT_FORMATS, DATASET
 
 router = APIRouter()
 
-# 确保数据目录和初始文件存在
-DatasetService.ensure_output_file_exists()
-
 @router.get("/formats")
 async def get_formats(
     api_key: str = Depends(get_api_key),

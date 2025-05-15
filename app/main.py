@@ -29,7 +29,6 @@ app.include_router(project.router, prefix="/api/project", tags=["项目管理"])
 
 # 挂载静态文件
 app.mount("/output", StaticFiles(directory=settings.OUTPUT_DIR), name="output")
-app.mount("/export", StaticFiles(directory=settings.EXPORT_DIR), name="export")
 
 @app.get("/")
 async def root():
