@@ -43,6 +43,25 @@ def get_output_path(*paths: Union[str, Path]) -> str:
     from app.core.config import settings
     return join_paths(settings.OUTPUT_DIR, *paths)
 
+def get_project_output_path(project_id: str, *paths: Union[str, Path]) -> str:
+    """
+    获取项目特定的输出目录下的文件路径
+    
+    Args:
+        project_id: 项目ID
+        *paths: 路径片段，将会被添加到项目输出目录后
+        
+    Returns:
+        str: 完整的项目输出文件路径
+    """
+    if not project_id:
+        return get_output_path(*paths)
+    
+    from app.core.config import settings
+    project_dir = join_paths(settings.OUTPUT_DIR, str(project_id))
+    ensure_dir(project_dir)
+    return join_paths(project_dir, *paths)
+
 def get_export_path(*paths: Union[str, Path]) -> str:
     """
     获取导出目录下的文件路径

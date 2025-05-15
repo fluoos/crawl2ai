@@ -8,8 +8,8 @@ import request from './request';
 export const getDatasetList = (params) => {
   return request({
     url: '/api/dataset/list',
-    method: 'post',
-    data: params
+    method: 'get',
+    params: params
   });
 };
 

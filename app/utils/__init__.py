@@ -4,7 +4,8 @@ from app.utils.path_utils import (
     get_output_path,
     get_export_path,
     get_upload_path,
-    get_config_path
+    get_config_path,
+    get_project_output_path
 )
 
 __all__ = [
@@ -13,5 +14,6 @@ __all__ = [
     'get_output_path',
     'get_export_path',
     'get_upload_path',
-    'get_config_path'
+    'get_config_path',
+    'get_project_output_path'
 ] 

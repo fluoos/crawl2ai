@@ -11,6 +11,7 @@ class CrawlerRequest(BaseModel):
     exclude_patterns: Optional[List[str]] = None
     crawl_strategy: Literal["bfs", "dfs"] = settings.DEFAULT_CRAWL_STRATEGY
     force_refresh: bool = False
+    projectId: Optional[str] = None
     
 class UrlItem(BaseModel):
     id: int
@@ -29,6 +30,7 @@ class UrlToMarkdownRequest(BaseModel):
     output_dir: Optional[str] = settings.OUTPUT_DIR
     included_selector: Optional[str] = None
     excluded_selector: Optional[str] = None
+    projectId: Optional[str] = None
     
 class UrlToMarkdownResponse(BaseModel):
     status: str

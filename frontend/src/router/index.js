@@ -3,7 +3,13 @@ import { createRouter, createWebHistory } from 'vue-router';
 const routes = [
   {
     path: '/',
-    redirect: '/links'
+    redirect: '/projects'
+  },
+  {
+    path: '/projects',
+    name: 'projectManagement',
+    component: () => import('../views/ProjectManager.vue'),
+    meta: { title: '项目管理' }
   },
   {
     path: '/links',
@@ -38,6 +44,13 @@ const router = createRouter({
 
 router.beforeEach((to, from, next) => {
   document.title = to.meta.title ? `${to.meta.title} - Crawl To AI` : 'Crawl To AI';
+  // 在路由切换时，判断如果不是project管理页面，则判断本地storage中是否存在当前项目信息，如果不存在，则跳转到project管理页面
+  if (to.path !== '/projects') {
+    const currentProject = localStorage.getItem('currentProject');
+    if (!currentProject) {
+      router.push('/projects');
+    }
+  }
   next();
 });
 

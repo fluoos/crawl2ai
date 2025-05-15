@@ -82,7 +82,7 @@
           </a-col>
         </a-row>
       </a-form>
-      <a-row :gutter="24"> 
+      <a-row :gutter="24">
         <a-alert
           v-if="crawlStatus"
           :message="crawlStatus"
@@ -90,6 +90,9 @@
           show-icon
           style="flex: 1; margin-right: 10px;"
         >
+          <template v-if="crawlStatus.includes('进行中')" #icon>
+            <a-spin size="small" style="margin-right: 10px;"/>
+          </template>
         </a-alert>
         <a-button v-if="crawlStatus.includes('进行中')" style="height: 40px;" danger type="primary" @click="handleStopCrawl">
           强制停止
@@ -165,13 +168,6 @@
           />
           <div class="form-item-hint">CSS选择器，用于指定要排除的HTML元素</div>
         </a-form-item>
-        <a-form-item label="输出目录" name="outputDir">
-          <a-input 
-            v-model:value="convertOptions.outputDir" 
-            disabled
-            placeholder="输出目录路径"
-          />
-        </a-form-item>
       </a-form>
     </a-modal>
   </div>
@@ -180,7 +176,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue';
 import { message, Modal } from 'ant-design-vue';
-import { ReloadOutlined } from '@ant-design/icons-vue';
+import { ReloadOutlined  } from '@ant-design/icons-vue';
 import { crawlLinks, getCrawlStatus, convertToMarkdown, stopCrawl, deleteUrls } from '../services/crawler';
 
 // 表单状态
@@ -197,8 +193,7 @@ const formState = reactive({
 // 转换选项状态
 const convertOptions = reactive({
   includedSelector: '',
-  excludedSelector: '',
-  outputDir: 'output/markdown'
+  excludedSelector: ''
 });
 
 // 转换弹窗状态
@@ -443,7 +438,6 @@ const handleConvertConfirm = async () => {
   try {
     const response = await convertToMarkdown({
       urls: urlsToConvert.value,
-      output_dir: convertOptions.outputDir,
       included_selector: convertOptions.includedSelector || null,
       excluded_selector: convertOptions.excludedSelector || null
     });

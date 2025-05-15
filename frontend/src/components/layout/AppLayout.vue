@@ -3,6 +3,7 @@
     <a-layout-header class="header">
       <div class="logo">Crawl To AI</div>
       <a-menu
+        v-if="!isProjectPage"
         v-model:selectedKeys="selectedKeys"
         theme="dark"
         mode="horizontal"
@@ -29,6 +30,25 @@
           </router-link>
         </a-menu-item>
       </a-menu>
+      <div v-if="currentProject && !isProjectPage" class="project-info">
+        <a-tooltip placement="bottom" title="返回项目管理">
+          <a-button 
+            type="primary" 
+            shape="circle" 
+            size="middle" 
+            @click="navigateToProject"
+            class="back-btn"
+          >
+            <template #icon><RollbackOutlined /></template>
+          </a-button>
+        </a-tooltip>
+        <div class="project-header">
+          <span class="project-label">当前项目:</span>
+          <span class="project-name" :title="currentProject.name">
+            <ProjectOutlined /> {{ currentProject.name }}
+          </span>
+        </div>
+      </div>
     </a-layout-header>
     
     <a-layout-content class="content">
@@ -44,15 +64,41 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue';
+import { ref, watch, computed } from 'vue';
 import { useRoute } from 'vue-router';
-import { LinkOutlined, FileOutlined, DatabaseOutlined, SettingOutlined } from '@ant-design/icons-vue';
+import { useRouter } from 'vue-router';
+import { 
+  LinkOutlined, 
+  FileOutlined, 
+  DatabaseOutlined, 
+  SettingOutlined, 
+  RollbackOutlined,
+  ProjectOutlined
+} from '@ant-design/icons-vue';
 
 const route = useRoute();
+const router = useRouter();
 const selectedKeys = ref([route.path.split('/')[1] || 'links']);
+
+const currentProject = ref(null);
+
+const isProjectPage = computed(() => {
+  return route.path.startsWith('/projects');
+});
+
+const navigateToProject = () => {
+  // 删除本地storage中的当前项目信息
+  localStorage.removeItem('currentProject');
+  router.push('/projects');
+};
 
 watch(() => route.path, (newPath) => {
   selectedKeys.value = [newPath.split('/')[1] || 'links'];
+  if (!isProjectPage.value) {
+    // 判断本地storage中是否存在当前项目信息，如果不存在，则跳转到项目管理页
+    const projectStr = localStorage.getItem('currentProject');
+    currentProject.value = projectStr ? JSON.parse(projectStr) : null;
+  }
 });
 </script>
 
@@ -76,6 +122,50 @@ watch(() => route.path, (newPath) => {
   font-weight: bold;
   margin-right: 30px;
   white-space: nowrap;
+}
+
+.project-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+}
+
+.back-btn {
+  transition: all 0.3s;
+}
+
+.back-btn:hover {
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+}
+
+.project-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: white;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 4px 12px;
+  border-radius: 16px;
+  max-width: 300px;
+  height: 32px;
+}
+
+.project-label {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.project-name {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 180px;
+}
+
+.dataset-count {
+  margin-left: 4px;
 }
 
 .content {

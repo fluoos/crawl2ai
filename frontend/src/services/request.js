@@ -10,6 +10,48 @@ const service = axios.create({
 // 请求拦截器
 service.interceptors.request.use(
   config => {
+    // 检查本地存储中是否有当前项目信息
+    const projectStr = localStorage.getItem('currentProject');
+    if (projectStr) {
+      try {
+        const currentProject = JSON.parse(projectStr);
+        if (currentProject && currentProject.id) {
+          // 根据请求方法类型，添加projectId参数
+          if (config.method === 'get') {
+            // GET请求：添加到params
+            config.params = { 
+              ...config.params, 
+              projectId: currentProject.id 
+            };
+          } else {
+            // POST/PUT/DELETE等请求：添加到data
+            if (!config.data) {
+              config.data = {};
+            }
+            
+            // 检查data类型，如果是FormData，则直接添加字段
+            if (config.data instanceof FormData) {
+              config.data.append('projectId', currentProject.id);
+            } else if (typeof config.data === 'string') {
+              // 如果data是JSON字符串，则解析后添加
+              try {
+                const data = JSON.parse(config.data);
+                data.projectId = currentProject.id;
+                config.data = JSON.stringify(data);
+              } catch (e) {
+                // 如果解析失败，则不修改data
+                console.warn('无法在JSON字符串中添加projectId');
+              }
+            } else {
+              // 如果是普通对象，直接添加
+              config.data.projectId = currentProject.id;
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('解析本地项目信息失败', e);
+      }
+    }
     return config;
   },
   error => {
