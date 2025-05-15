@@ -165,13 +165,6 @@
           />
           <div class="form-item-hint">CSS选择器，用于指定要排除的HTML元素</div>
         </a-form-item>
-        <a-form-item label="输出目录" name="outputDir">
-          <a-input 
-            v-model:value="convertOptions.outputDir" 
-            disabled
-            placeholder="输出目录路径"
-          />
-        </a-form-item>
       </a-form>
     </a-modal>
   </div>
@@ -197,8 +190,7 @@ const formState = reactive({
 // 转换选项状态
 const convertOptions = reactive({
   includedSelector: '',
-  excludedSelector: '',
-  outputDir: 'output/markdown'
+  excludedSelector: ''
 });
 
 // 转换弹窗状态
@@ -443,7 +435,6 @@ const handleConvertConfirm = async () => {
   try {
     const response = await convertToMarkdown({
       urls: urlsToConvert.value,
-      output_dir: convertOptions.outputDir,
       included_selector: convertOptions.includedSelector || null,
       excluded_selector: convertOptions.excludedSelector || null
     });

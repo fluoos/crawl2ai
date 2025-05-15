@@ -41,7 +41,49 @@ class DatasetService:
             os.makedirs(os.path.join(settings.EXPORT_DIR, style.lower()), exist_ok=True)
     
     @staticmethod
-    def get_formats():
+    def get_project_dataset_path(project_id: Optional[str] = None) -> str:
+        """
+        获取数据集文件路径
+        如果提供了项目ID，则返回项目下的数据集路径
+        否则返回默认数据集路径
+        """
+        if project_id:
+            # 项目目录路径 - 修改路径结构
+            project_dir = os.path.join(settings.OUTPUT_DIR, str(project_id))
+            # 确保项目目录存在
+            os.makedirs(project_dir, exist_ok=True)
+            # 项目数据集文件路径
+            project_dataset_path = os.path.join(project_dir, "qa_dataset.jsonl")
+            # 如果项目数据集文件不存在，创建空文件
+            if not os.path.exists(project_dataset_path):
+                with open(project_dataset_path, "w", encoding="utf-8") as f:
+                    pass
+            return project_dataset_path
+        else:
+            # 返回默认数据集路径
+            return INPUT_FILE
+    
+    @staticmethod
+    def get_project_export_path(style: str, project_id: Optional[str] = None) -> str:
+        """
+        获取项目导出目录路径
+        如果提供了项目ID，则返回项目下的导出目录
+        否则返回默认导出目录
+        """
+        if project_id:
+            # 项目导出目录 - 修改路径结构
+            project_export_dir = os.path.join(settings.OUTPUT_DIR, str(project_id), "export", style.lower())
+            # 确保目录存在
+            os.makedirs(project_export_dir, exist_ok=True)
+            return project_export_dir
+        else:
+            # 返回默认导出目录
+            export_dir = os.path.join(settings.EXPORT_DIR, style.lower())
+            os.makedirs(export_dir, exist_ok=True)
+            return export_dir
+    
+    @staticmethod
+    def get_formats(project_id: Optional[str] = None):
         """获取支持的文件格式和数据集风格"""
         return {
             "formats": EXPORT_FORMATS,
@@ -49,7 +91,7 @@ class DatasetService:
         }
     
     @staticmethod
-    def get_format_examples():
+    def get_format_examples(project_id: Optional[str] = None):
         """获取各种格式的示例"""
         examples = {
             "Alpaca": {
@@ -90,8 +132,11 @@ class DatasetService:
         return examples
     
     @staticmethod
-    def get_stats(input_file: str = INPUT_FILE) -> Dict[str, Any]:
+    def get_stats(project_id: Optional[str] = None) -> Dict[str, Any]:
         """获取数据集统计信息"""
+        # 根据project_id获取数据集路径
+        input_file = DatasetService.get_project_dataset_path(project_id)
+        
         # 读取原始数据
         data = DatasetService.read_jsonl_file(input_file)
         
@@ -118,11 +163,18 @@ class DatasetService:
     def list_data(
         input_file: str = "qa_dataset.jsonl", 
         page: int = 1,
-        page_size: int = 20
+        page_size: int = 20,
+        project_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """预览数据转换结果"""
+        # 根据project_id获取数据集路径
+        file_path = input_file
+        if project_id:
+            file_path = DatasetService.get_project_dataset_path(project_id)
+        else:
+            file_path = os.path.join(settings.OUTPUT_DIR, input_file)
+            
         # 读取原始数据
-        file_path = os.path.join(settings.OUTPUT_DIR, input_file)
         data = DatasetService.read_jsonl_file(file_path)
         if not data:
             return {"data": [], "total": 0, "page": page, "pageSize": page_size}
@@ -162,7 +214,8 @@ class DatasetService:
         style: str = "Alpaca",
         input_file: str = "qa_dataset.jsonl",
         output_file: Optional[str] = None,
-        template: Optional[Dict] = None
+        template: Optional[Dict] = None,
+        project_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """导出数据集"""
         if format_type not in EXPORT_FORMATS:
@@ -172,7 +225,12 @@ class DatasetService:
             raise ValueError(f"不支持的数据集风格: {style}")
         
         # 读取原始数据
-        file_path = os.path.join(settings.OUTPUT_DIR, input_file)
+        file_path = input_file
+        if project_id:
+            file_path = DatasetService.get_project_dataset_path(project_id)
+        else:
+            file_path = os.path.join(settings.OUTPUT_DIR, input_file)
+            
         data = DatasetService.read_jsonl_file(file_path)
         if not data:
             raise ValueError(f"文件 {input_file} 为空或不存在")
@@ -193,9 +251,8 @@ class DatasetService:
         if not output_file.endswith(f".{format_type}"):
             output_file += f".{format_type}"
         
-        # 确保导出目录存在
-        style_dir = os.path.join(settings.EXPORT_DIR, style.lower())
-        os.makedirs(style_dir, exist_ok=True)
+        # 确保导出目录存在，并根据项目ID选择正确的路径
+        style_dir = DatasetService.get_project_export_path(style, project_id)
         output_path = os.path.join(style_dir, output_file)
         
         # 根据格式保存文件
@@ -204,22 +261,28 @@ class DatasetService:
         elif format_type == "json":
             DatasetService.save_as_json(converted_data, output_path)
         
+        # 构建下载URL
+        download_url = f"/api/dataset/download/{style.lower()}/{output_file}"
+        if project_id:
+            download_url += f"?projectId={project_id}"
+        
         # 返回文件信息
         return {
             "success": True,
             "message": "导出成功",
             "filename": output_file,
             "path": output_path,
-            "downloadUrl": f"/api/dataset/download/{style.lower()}/{output_file}"
+            "downloadUrl": download_url
         }
     
     @staticmethod
-    def delete_items(ids: List[int]) -> Dict[str, Any]:
+    def delete_items(ids: List[int], project_id: Optional[str] = None) -> Dict[str, Any]:
         """删除指定的问答对"""
         if not ids:
             raise ValueError("请提供要删除的问答对ID")
         
-        dataset_path = os.path.join(settings.OUTPUT_DIR, "qa_dataset.jsonl")
+        # 根据项目ID获取数据集路径
+        dataset_path = DatasetService.get_project_dataset_path(project_id)
         
         if not os.path.exists(dataset_path):
             raise ValueError("数据集文件不存在")
@@ -239,13 +302,6 @@ class DatasetService:
         invalid_ids = [id for id in ids if id not in existing_ids]
         if invalid_ids:
             raise ValueError(f"无效的ID: {invalid_ids}")
-        
-        # 备份原始文件
-        # backup_path = os.path.join(settings.OUTPUT_DIR, f"qa_dataset.jsonl.bak.{datetime.now().strftime('%Y%m%d%H%M%S')}")
-        # try:
-        #     shutil.copy2(dataset_path, backup_path)
-        # except Exception as e:
-        #     logging.warning(f"备份原始文件失败: {str(e)}")
         
         # 删除指定ID的项
         to_delete = set(ids)
@@ -274,9 +330,12 @@ class DatasetService:
         }
     
     @staticmethod
-    def get_download_file_path(style: str, filename: str) -> str:
+    def get_download_file_path(style: str, filename: str, project_id: Optional[str] = None) -> str:
         """获取下载文件的路径"""
-        file_path = os.path.join(settings.EXPORT_DIR, style, filename)
+        # 根据项目ID选择正确的导出目录
+        style_dir = DatasetService.get_project_export_path(style, project_id)
+        file_path = os.path.join(style_dir, filename)
+        
         if not os.path.exists(file_path):
             raise ValueError("文件不存在")
         return file_path
@@ -284,45 +343,63 @@ class DatasetService:
     # Markdown转换相关功能
     
     @staticmethod
-    def save_conversion_task_status(files: List[str], output_file: str) -> Dict[str, Any]:
+    def save_conversion_task_status(files: List[str], output_file: str, project_id: Optional[str] = None) -> Dict[str, Any]:
         """启动文件转换任务"""
-        
+        # 用项目ID作为状态的key，以支持不同项目的并行转换
+        task_key = output_file
+        if project_id:
+            task_key = f"{project_id}_{output_file}"
+            
         # 更新转换状态
-        conversion_state[output_file] = {
+        conversion_state[task_key] = {
             "status": "running",
             "message": "转换任务正在进行中...",
             "progress": 0,
-            "total": len(files)
+            "total": len(files),
+            "project_id": project_id
         }
         
         return {"status": "success", "message": "转换任务已开始"}
     
     @staticmethod
-    async def convert_files_to_dataset_task(files: List[str], output_file: str):
+    async def convert_files_to_dataset_task(files: List[str], output_file: str, project_id: Optional[str] = None):
         """转换文件到数据集的后台任务"""
-        print(f"正在转换 {len(files)} 个文件")
+        # 用项目ID作为状态的key
+        task_key = output_file
+        if project_id:
+            task_key = f"{project_id}_{output_file}"
+            
+        print(f"正在转换 {len(files)} 个文件, 项目ID: {project_id}")
         try:
-            await DatasetService.convert_files_to_dataset(files, output_file)
-            conversion_state[output_file]["status"] = "completed"
-            conversion_state[output_file]["message"] = "转换任务已完成"
-            conversion_state[output_file]["progress"] = conversion_state[output_file]["total"]
+            await DatasetService.convert_files_to_dataset(files, output_file, project_id)
+            conversion_state[task_key]["status"] = "completed"
+            conversion_state[task_key]["message"] = "转换任务已完成"
+            conversion_state[task_key]["progress"] = conversion_state[task_key]["total"]
         except Exception as e:
-            conversion_state[output_file]["status"] = "failed"
-            conversion_state[output_file]["message"] = f"转换任务失败: {str(e)}"
+            conversion_state[task_key]["status"] = "failed"
+            conversion_state[task_key]["message"] = f"转换任务失败: {str(e)}"
             logging.error(f"转换任务失败: {str(e)}")
     
     @staticmethod
     async def convert_files_to_dataset(
         files: List[str],
         output_file: str = "qa_dataset.jsonl",
+        project_id: Optional[str] = None
     ) -> str:
         """将Markdown文件转换为问答数据集"""
         if not files:
             raise ValueError("文件列表不能为空")
         
-        output_path = os.path.join("output", output_file)
+        # 根据项目ID确定输出路径 - 修改路径结构
+        if project_id:
+            project_dir = os.path.join(settings.OUTPUT_DIR, str(project_id))
+            os.makedirs(project_dir, exist_ok=True)
+            output_path = os.path.join(project_dir, output_file)
+        else:
+            output_path = os.path.join("output", output_file)
+            
         results = []
-        print(f"开始转换 {len(files)} 个文件")
+        print(f"开始转换 {len(files)} 个文件, 项目ID: {project_id}")
         
         # 获取默认模型配置
         models_list = SystemService._read_json_file(SystemService.MODELS_CONFIG_FILE, [])
@@ -346,7 +423,10 @@ class DatasetService:
         system_prompt = prompt.get("data", "")
         
         # 初始化转换状态
-        conversion_state[output_file]["progress"] = 0
+        task_key = output_file
+        if project_id:
+            task_key = f"{project_id}_{output_file}"
+        conversion_state[task_key]["progress"] = 0
         
         for i, file_path in enumerate(files):
             try:
@@ -419,7 +499,7 @@ class DatasetService:
                         })
                 
                 # 更新进度
-                conversion_state[output_file]["progress"] = i + 1
+                conversion_state[task_key]["progress"] = i + 1
                 
                 # 避免API速率限制
                 await asyncio.sleep(1)
@@ -428,33 +508,40 @@ class DatasetService:
                 logging.error(f"处理文件 {file_path} 时出错: {str(e)}")
         
         # 确保输出目录存在并以追加模式写入文件
-        os.makedirs("output", exist_ok=True)
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
         with open(output_path, "a", encoding="utf-8") as f:
             for item in results:
                 f.write(json.dumps(item, ensure_ascii=False) + "\n")
         
         # 更新markdown_manager.json中相应文件的isDataset状态
-        DatasetService.update_markdown_dataset_status(files)
+        DatasetService.update_markdown_dataset_status(files, project_id)
 
         # 为没有id的数据行添加自增id
-        DatasetService.add_missing_ids(output_file)
+        DatasetService.add_missing_ids(output_file, project_id)
         
         print(f"提取了 {len(results)} 个问答对")
         return output_path
     
     @staticmethod
-    def update_markdown_dataset_status(files: List[str]) -> bool:
+    def update_markdown_dataset_status(files: List[str], project_id: Optional[str] = None) -> bool:
         """
         更新markdown_manager.json中文件的isDataset状态为True
         
         参数:
         - files: 需要更新的文件路径列表
+        - project_id: 可选的项目ID
         
         返回:
         - bool: 是否成功更新了文件
         """
         try:
-            manager_path = os.path.join("output", "markdown_manager.json")
+            # 根据项目ID确定manager文件路径
+            if project_id:
+                manager_dir = os.path.join(settings.OUTPUT_DIR, str(project_id))
+                manager_path = os.path.join(manager_dir, "markdown_manager.json")
+            else:
+                manager_path = os.path.join("output", "markdown_manager.json")
+                
             if os.path.exists(manager_path):
                 # 读取文件内容
                 with open(manager_path, 'r', encoding='utf-8') as f:
@@ -506,89 +593,142 @@ class DatasetService:
             return False
     
     @staticmethod
-    def get_conversion_state(output_file: str) -> Dict[str, Any]:
+    def get_conversion_state(output_file: str, project_id: Optional[str] = None) -> Dict[str, Any]:
         """获取转换任务的状态"""
-        if output_file in conversion_state:
-            return conversion_state[output_file]
-        return {
-            "status": "not_found",
-            "message": "转换任务不存在",
-            "progress": 0,
-            "total": 0
-        }
+        # 用项目ID作为状态的key
+        task_key = output_file
+        if project_id:
+            task_key = f"{project_id}_{output_file}"
+            
+        if task_key not in conversion_state:
+            return {
+                "status": "not_found",
+                "message": "没有找到对应的转换任务",
+                "progress": 0,
+                "total": 0
+            }
+        
+        return conversion_state[task_key]
     
     @staticmethod
     def add_qa_item(
         question: str,
         answer: str,
         chain_of_thought: Optional[str] = None,
-        label: Optional[str] = None
+        label: Optional[str] = None,
+        project_id: Optional[str] = None
     ) -> Dict[str, Any]:
-        """
-        向数据集中添加一个新的问答对
-        
-        参数:
-        - question: 问题内容
-        - answer: 答案内容
-        - chain_of_thought: 思考链，可选
-        - label: 分类标签，可选
-        
-        返回:
-        - Dict[str, Any]: 包含操作状态信息的字典
-        """
-        if not question or not answer:
+        """添加问答对到数据集"""
+        if not question.strip() or not answer.strip():
             raise ValueError("问题和答案不能为空")
         
-        # 确保输出目录存在
-        os.makedirs(settings.OUTPUT_DIR, exist_ok=True)
+        # 根据项目ID获取数据集路径
+        dataset_path = DatasetService.get_project_dataset_path(project_id)
         
-        # 读取现有数据以找到最大id
-        dataset_path = os.path.join(settings.OUTPUT_DIR, "qa_dataset.jsonl")
-        max_id = 0
-        
+        # 读取现有数据
+        items = []
         if os.path.exists(dataset_path):
             try:
-                data = DatasetService.read_jsonl_file(dataset_path)
-                for item in data:
-                    if "id" in item and isinstance(item["id"], (int, float)):
-                        max_id = max(max_id, int(item["id"]))
+                with open(dataset_path, "r", encoding="utf-8") as f:
+                    for line in f:
+                        if line.strip():
+                            items.append(json.loads(line))
             except Exception as e:
-                logging.warning(f"读取数据集获取最大id时出错: {str(e)}")
+                raise ValueError(f"读取数据集文件失败: {str(e)}")
         
-        # 构建问答对数据
-        qa_item = {
-            "id": max_id + 1,
+        # 确定新ID
+        new_id = 1
+        if items:
+            existing_ids = [item.get("id", 0) for item in items if "id" in item]
+            if existing_ids:
+                new_id = max(existing_ids) + 1
+        
+        # 创建新项
+        now = datetime.now().isoformat()
+        new_item = {
+            "id": new_id,
             "question": question,
-            "answer": answer
+            "answer": answer,
+            "chainOfThought": chain_of_thought if chain_of_thought else "",
+            "label": label if label else "",
+            "timestamp": now
         }
         
-        # 添加可选字段
-        if chain_of_thought:
-            qa_item["chainOfThought"] = chain_of_thought
-            
-        if label:
-            qa_item["label"] = label
-            
-        # 写入数据
+        # 添加到文件
         try:
             with open(dataset_path, "a", encoding="utf-8") as f:
-                f.write(json.dumps(qa_item, ensure_ascii=False) + "\n")
-            
-            # 获取更新后的统计信息
-            stats = DatasetService.get_stats()
-            
-            return {
-                "status": "success",
-                "message": "问答对添加成功",
-                "qa_item": qa_item,
-                "stats": stats
-            }
+                f.write(json.dumps(new_item, ensure_ascii=False) + "\n")
         except Exception as e:
-            logging.error(f"添加问答对失败: {str(e)}")
-            raise ValueError(f"添加问答对失败: {str(e)}")
+            raise ValueError(f"添加数据失败: {str(e)}")
+        
+        return {
+            "status": "success",
+            "message": "添加问答对成功",
+            "data": new_item
+        }
     
     @staticmethod
-    def add_missing_ids(input_file: str = INPUT_FILE) -> Dict[str, Any]:
+    def update_qa_item(
+        id: int,
+        question: str,
+        answer: str,
+        chain_of_thought: Optional[str] = None,
+        label: Optional[str] = None,
+        project_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """更新问答对"""
+        if not question.strip() or not answer.strip():
+            raise ValueError("问题和答案不能为空")
+        
+        # 根据项目ID获取数据集路径
+        dataset_path = DatasetService.get_project_dataset_path(project_id)
+        
+        if not os.path.exists(dataset_path):
+            raise ValueError(f"数据集文件不存在")
+        
+        # 读取现有数据
+        items = []
+        try:
+            with open(dataset_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    if line.strip():
+                        items.append(json.loads(line))
+        except Exception as e:
+            raise ValueError(f"读取数据集文件失败: {str(e)}")
+        
+        # 查找并更新项
+        found = False
+        for i, item in enumerate(items):
+            if "id" in item and item["id"] == id:
+                # 更新内容
+                items[i]["question"] = question
+                items[i]["answer"] = answer
+                items[i]["chainOfThought"] = chain_of_thought if chain_of_thought else ""
+                items[i]["label"] = label if label else ""
+                items[i]["timestamp"] = datetime.now().isoformat()
+                found = True
+                updated_item = items[i]
+                break
+        
+        if not found:
+            raise ValueError(f"未找到ID为{id}的问答对")
+        
+        # 写回文件
+        try:
+            with open(dataset_path, "w", encoding="utf-8") as f:
+                for item in items:
+                    f.write(json.dumps(item, ensure_ascii=False) + "\n")
+        except Exception as e:
+            raise ValueError(f"更新数据失败: {str(e)}")
+        
+        return {
+            "status": "success",
+            "message": "更新问答对成功",
+            "data": updated_item
+        }
+    
+    @staticmethod
+    def add_missing_ids(input_file: str = INPUT_FILE, project_id: Optional[str] = None) -> Dict[str, Any]:
         """
         为数据集中没有id的数据行添加自增id
         
@@ -598,9 +738,9 @@ class DatasetService:
         返回:
         - Dict[str, Any]: 包含操作状态信息的字典
         """
-        file_path = os.path.join(settings.OUTPUT_DIR, input_file)
+        file_path = DatasetService.get_project_dataset_path(project_id)
         if not os.path.exists(file_path):
-            raise ValueError(f"文件 {input_file} 不存在")
+            raise ValueError(f"文件 {file_path} 不存在")
         
         # 读取原始数据
         data = DatasetService.read_jsonl_file(file_path)
@@ -649,95 +789,6 @@ class DatasetService:
             "message": f"成功为 {updated_count} 条数据添加id",
             "total": len(data),
             "updated": updated_count
-        }
-    
-    @staticmethod
-    def update_qa_item(
-        id: int,
-        question: str,
-        answer: str,
-        chain_of_thought: Optional[str] = None,
-        label: Optional[str] = None
-    ) -> Dict[str, Any]:
-        """
-        编辑数据集中的问答对
-        
-        参数:
-        - id: 要编辑的问答对ID
-        - question: 更新后的问题内容
-        - answer: 更新后的答案内容
-        - chain_of_thought: 更新后的思考链，可选
-        - label: 更新后的分类标签，可选
-        
-        返回:
-        - Dict[str, Any]: 包含操作状态信息的字典
-        """
-        if not question or not answer:
-            raise ValueError("问题和答案不能为空")
-            
-        dataset_path = os.path.join(settings.OUTPUT_DIR, "qa_dataset.jsonl")
-        
-        if not os.path.exists(dataset_path):
-            raise ValueError("数据集文件不存在")
-        
-        # 读取所有数据
-        items = []
-        try:
-            with open(dataset_path, "r", encoding="utf-8") as f:
-                for line in f:
-                    if line.strip():
-                        items.append(json.loads(line))
-        except Exception as e:
-            raise ValueError(f"读取数据集文件失败: {str(e)}")
-            
-        # 查找并更新指定ID的项
-        found = False
-        for item in items:
-            if "id" in item and item["id"] == id:
-                item["question"] = question
-                item["answer"] = answer
-                
-                # 更新可选字段
-                if chain_of_thought is not None:
-                    item["chainOfThought"] = chain_of_thought
-                elif "chainOfThought" in item:
-                    # 如果前端没有提供该字段且原数据有该字段，保留原值
-                    pass
-                    
-                if label is not None:
-                    item["label"] = label
-                elif "label" in item:
-                    # 如果前端没有提供该字段且原数据有该字段，保留原值
-                    pass
-                    
-                found = True
-                break
-                
-        if not found:
-            raise ValueError(f"未找到ID为 {id} 的问答对")
-            
-        # 将更新后的数据写回文件
-        try:
-            with open(dataset_path, "w", encoding="utf-8") as f:
-                for item in items:
-                    f.write(json.dumps(item, ensure_ascii=False) + "\n")
-        except Exception as e:
-            raise ValueError(f"写入更新后的数据集失败: {str(e)}")
-            
-        # 获取更新后的统计信息
-        stats = DatasetService.get_stats()
-        
-        return {
-            "status": "success",
-            "message": f"成功更新ID为 {id} 的问答对",
-            "updated_item": {
-                "id": id,
-                "question": question,
-                "answer": answer,
-                "chainOfThought": chain_of_thought,
-                "label": label
-            },
-            "stats": stats
         }
     
     # 辅助方法

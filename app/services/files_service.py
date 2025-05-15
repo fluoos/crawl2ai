@@ -2,16 +2,19 @@ import os
 import shutil
 import json
 import datetime
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
+
+from app.utils.path_utils import get_project_output_path, ensure_dir, join_paths
+from app.core.config import settings
 
 class FilesService:
     """文件服务类，处理所有与文件相关的业务逻辑"""
     
     @staticmethod
-    def get_file_list(page: int = 1, page_size: int = 10) -> Dict[str, Any]:
+    def get_file_list(page: int = 1, page_size: int = 10, project_id: Optional[str] = None) -> Dict[str, Any]:
         """获取文件列表"""
         # 读取markdown_manager.json文件
-        manager_path = os.path.join("output", "markdown_manager.json")
+        manager_path = get_project_output_path(project_id, "markdown_manager.json")
         all_files = []
         
         if os.path.exists(manager_path):
@@ -74,7 +77,7 @@ class FilesService:
         }
     
     @staticmethod
-    def preview_file(path: str) -> Dict[str, Any]:
+    def preview_file(path: str, project_id: Optional[str] = None) -> Dict[str, Any]:
         """预览Markdown文件内容"""
         # 安全检查：确保path是有效的，防止目录遍历攻击
         if ".." in path or "~" in path:
@@ -120,13 +123,14 @@ class FilesService:
             raise ValueError("文件编码错误，无法预览")
     
     @staticmethod
-    def upload_files(files: List[Any]) -> Dict[str, Any]:
+    def upload_files(files: List[Any], project_id: Optional[str] = None) -> Dict[str, Any]:
         """上传文件，非Markdown文件会被自动转换"""
         # 确保目录存在
-        upload_dir = "upload"
-        markdown_dir = os.path.join("output", "markdown")
-        os.makedirs(upload_dir, exist_ok=True)
-        os.makedirs(markdown_dir, exist_ok=True)
+        upload_dir = get_project_output_path(project_id, "upload")
+        markdown_dir = get_project_output_path(project_id, "markdown")
+        
+        ensure_dir(upload_dir)
+        ensure_dir(markdown_dir)
         
         uploaded_files = []
         converted_files = []
@@ -147,7 +151,7 @@ class FilesService:
                 
                 # 更新markdown_manager.json
                 base_name = os.path.splitext(file.filename)[0]
-                FilesService.update_markdown_registry(original_path, markdown_path, base_name, is_converted=False)
+                FilesService.update_markdown_registry(original_path, markdown_path, base_name, is_converted=False, project_id=project_id)
                 
                 uploaded_files.append({
                     "filename": file.filename,
@@ -160,7 +164,8 @@ class FilesService:
                 conversion_result = FilesService.convert_to_markdown(
                     original_path=original_path,
                     markdown_dir=markdown_dir,
-                    filename=file.filename
+                    filename=file.filename,
+                    project_id=project_id
                 )
                 
                 if conversion_result["success"]:
@@ -182,7 +187,7 @@ class FilesService:
         }
     
     @staticmethod
-    def convert_to_markdown(original_path: str, markdown_dir: str, filename: str) -> Dict[str, Any]:
+    def convert_to_markdown(original_path: str, markdown_dir: str, filename: str, project_id: Optional[str] = None) -> Dict[str, Any]:
         """
         将非Markdown文件转换为Markdown格式
         
@@ -190,6 +195,7 @@ class FilesService:
         - original_path: 原始文件的完整路径
         - markdown_dir: Markdown文件的存储目录
         - filename: 原始文件名
+        - project_id: 项目ID
         
         返回:
         - Dict: 包含以下字段:
@@ -222,7 +228,7 @@ class FilesService:
             }
             
             # 更新markdown_manager.json
-            FilesService.update_markdown_registry(original_path, markdown_path, base_name, is_converted=True)
+            FilesService.update_markdown_registry(original_path, markdown_path, base_name, is_converted=True, project_id=project_id)
             
             return {
                 "success": True,
@@ -239,7 +245,7 @@ class FilesService:
             }
     
     @staticmethod
-    def update_markdown_registry(original_path, markdown_path, title=None, is_converted=True):
+    def update_markdown_registry(original_path, markdown_path, title=None, is_converted=True, project_id=None):
         """
         更新markdown_manager.json记录
         
@@ -248,9 +254,10 @@ class FilesService:
         - markdown_path: Markdown文件路径
         - title: 文件标题，默认为None
         - is_converted: 是否是转换而来的，还是本来就是markdown文件
+        - project_id: 项目ID
         """
         try:
-            manager_path = os.path.join("output", "markdown_manager.json")
+            manager_path = get_project_output_path(project_id, "markdown_manager.json")
             relative_path = markdown_path.replace('\\', '/')
             
             # 创建记录
@@ -264,9 +271,6 @@ class FilesService:
             
             if title:
                 file_record["title"] = title
-            
-            # 确保目录存在
-            os.makedirs("output", exist_ok=True)
             
             # 读取或创建manager数据
             manager_data = []
@@ -313,7 +317,7 @@ class FilesService:
             return False
     
     @staticmethod
-    def delete_files(data: Dict[str, Any]) -> Dict[str, Any]:
+    def delete_files(data: Dict[str, Any], project_id: Optional[str] = None) -> Dict[str, Any]:
         """删除指定的文件，同时更新markdown_manager.json和crawled_urls.json"""
         files = data.get("files", [])
         if not files:
@@ -322,8 +326,8 @@ class FilesService:
                 "message": "没有指定要删除的文件"
             }
         
-        manager_path = os.path.join("output", "markdown_manager.json")
-        crawled_urls_path = os.path.join("output", "crawled_urls.json")
+        manager_path = get_project_output_path(project_id, "markdown_manager.json")
+        crawled_urls_path = get_project_output_path(project_id, "crawled_urls.json")
         deleted_files = []
         failed_files = []
         
@@ -369,8 +373,8 @@ class FilesService:
             else:
                 # 如果在manager中找不到，尝试在markdown目录下查找
                 potential_paths = [
-                    os.path.join("output", "markdown", filename),
-                    os.path.join(".", "output", "markdown", filename)
+                    get_project_output_path(project_id, "markdown", filename),
+                    os.path.join(".", get_project_output_path(project_id, "markdown", filename))
                 ]
                 
                 deleted = False

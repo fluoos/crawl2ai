@@ -63,7 +63,6 @@ export const getCrawlStatus = () => {
  * 将URL列表转换为Markdown
  * @param {Object} data 
  * @param {Array<string>} data.urls URL列表
- * @param {string} data.output_dir 输出目录
  * @param {string} data.included_selector 包含选择器（可选）
  * @param {string} data.excluded_selector 排除选择器（可选）
  * @returns {Promise<Object>}
