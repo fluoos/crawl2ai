@@ -452,7 +452,7 @@ class CrawlerService:
         # 使用集合来跟踪已爬取的URL，便于快速查找
         crawled_urls = set()
         count = 0
-        print(f"刷新模式：{force_refresh}")
+        print(f"刷新模式：{force_refresh}, max_pages: {max_pages}, max_depth: {max_depth}")
         # 处理force_refresh参数
         if force_refresh:
             # 如果强制刷新，清空已有数据
@@ -539,6 +539,13 @@ class CrawlerService:
                         crawled_data.append(data)
                         with open(output_json_file, "w", encoding="utf-8") as f:
                             json.dump(crawled_data, f, ensure_ascii=False, indent=2)
+                        # 如果爬取的URL数量超过max_pages，则停止爬取，强制完成并更新状态
+                        if count >= max_pages:
+                            print(f"爬取完成，共找到 {count} 个URL")
+                            CrawlerService.stop_crawl(project_id)
+                            with open(get_project_output_path(project_id, "crawler_status.json"), "w", encoding="utf-8") as f:
+                                json.dump({"status": "completed", "message": "爬虫任务已完成"}, f)
+                            break
         except Exception as e:
             logging.error(f"爬取过程中发生错误: {str(e)}")
             print(f"爬取过程中发生错误: {str(e)}")

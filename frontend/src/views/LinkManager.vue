@@ -82,7 +82,7 @@
           </a-col>
         </a-row>
       </a-form>
-      <a-row :gutter="24"> 
+      <a-row :gutter="24">
         <a-alert
           v-if="crawlStatus"
           :message="crawlStatus"
@@ -90,6 +90,9 @@
           show-icon
           style="flex: 1; margin-right: 10px;"
         >
+          <template v-if="crawlStatus.includes('进行中')" #icon>
+            <a-spin size="small" style="margin-right: 10px;"/>
+          </template>
         </a-alert>
         <a-button v-if="crawlStatus.includes('进行中')" style="height: 40px;" danger type="primary" @click="handleStopCrawl">
           强制停止
@@ -173,7 +176,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue';
 import { message, Modal } from 'ant-design-vue';
-import { ReloadOutlined } from '@ant-design/icons-vue';
+import { ReloadOutlined  } from '@ant-design/icons-vue';
 import { crawlLinks, getCrawlStatus, convertToMarkdown, stopCrawl, deleteUrls } from '../services/crawler';
 
 // 表单状态
