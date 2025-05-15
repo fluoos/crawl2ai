@@ -47,9 +47,6 @@
           <span class="project-name" :title="currentProject.name">
             <ProjectOutlined /> {{ currentProject.name }}
           </span>
-          <a-tag color="blue" v-if="currentProject.dataset_count" class="dataset-count">
-            <DatabaseOutlined /> {{ currentProject.dataset_count }} 个数据集
-          </a-tag>
         </div>
       </div>
     </a-layout-header>
