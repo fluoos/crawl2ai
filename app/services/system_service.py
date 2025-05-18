@@ -2,6 +2,8 @@ import os
 import json
 import uuid
 from typing import Dict, Any, List
+
+import requests
 from app.core.config import settings
 from app.utils.path_utils import join_paths, get_config_path
 
@@ -453,3 +455,16 @@ class SystemService:
         SystemService._write_json_file(SystemService.FILE_STRATEGY_CONFIG_FILE, default_strategy)
         return {"status": "success", "message": "文件策略配置已重置"}
 
+    # 将模块级函数改为静态方法
+    @staticmethod
+    def send_to_websocket(data, project_id):
+        try:
+            response = requests.post(
+                "http://127.0.0.1:8000/api/system/internal/send-ws-message",
+                json=data,
+                params={"project_id": project_id}
+            )
+            return response.status_code == 200
+        except Exception as e:
+            print(f"发送WebSocket消息失败: {str(e)}")
+            return False

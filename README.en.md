@@ -49,7 +49,7 @@ npm install
 1. Start the backend server:
 
 ```bash
-uvicorn app.main:app --reload
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 --ws websockets
 ```
 
 2. Start the frontend development server:

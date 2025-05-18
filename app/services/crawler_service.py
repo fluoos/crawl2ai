@@ -8,7 +8,9 @@ from pathlib import Path
 from datetime import datetime
 from urllib.parse import urlparse
 from typing import List, Optional, Dict, Any, Set
+import uuid
 from app.core.config import settings
+from app.services.system_service import SystemService
 from app.utils.path_utils import (
     join_paths, 
     get_output_path,
@@ -611,14 +613,38 @@ class CrawlerService:
             
         run_config = CrawlerRunConfig(**run_config_dict)
 
+        # 用于跟踪进度
+        total_urls = len(urls)
+        processed_urls = 0
+        successful_urls = 0
+        # 生成任务通知的唯一ID，使用uuid
+        task_id = str(uuid.uuid4())
+        
+        # 发送初始进度更新
+        SystemService.send_to_websocket({
+            "task_id": task_id,
+            "type": "html_to_md_convert_progress",
+            "status": "started",
+            "progress": 0,
+            "total": total_urls,
+            "processed": 0,
+            "successful": 0,
+            "message": "开始转换URL为Markdown"
+        }, project_id)
+
         async with AsyncWebCrawler(config=browser_config) as crawler:
             # 该逻辑不能修改，stream=True模式要使用async for result in await
             async for result in await crawler.arun_many(
                 urls=list(urls),
                 config=run_config,
             ):
+                processed_urls += 1
+                progress_percent = int(processed_urls / total_urls * 100)
+                
                 print(f"已转换链接: {result.url}")
                 if result.success and result.markdown and result.markdown.strip():
+                    successful_urls += 1
+                    
                     # 生成文件名
                     filename = CrawlerService.url_to_filename(result.url)
                     filepath = join_paths(output_dir, filename)
@@ -633,13 +659,77 @@ class CrawlerService:
                     
                     # 更新crawled_urls.json，添加filePath字段
                     CrawlerService.update_crawled_url_filepath(result.url, filepath, project_id)
-                        
+                    
+                    # 发送成功通知
+                    SystemService.send_to_websocket({
+                        "task_id": task_id,
+                        "type": "html_to_md_convert_progress",
+                        "status": "processing",
+                        "progress": progress_percent,
+                        "total": total_urls,
+                        "processed": processed_urls,
+                        "successful": successful_urls,  
+                        "message": f"已成功转换URL: {result.url}",
+                        "url": result.url,
+                        "success": True
+                    }, project_id)
                 elif result.status_code == 403 and "robots.txt" in result.error_message:
                     print(f"跳过 {result.url} - 被robots.txt阻止")
+                    SystemService.send_to_websocket({
+                        "task_id": task_id,
+                        "type": "html_to_md_convert_progress",
+                        "status": "processing",
+                        "progress": progress_percent,
+                        "total": total_urls,
+                        "processed": processed_urls,
+                        "successful": successful_urls,
+                        "message": f"跳过URL: {result.url} - 被robots.txt阻止",
+                        "url": result.url,
+                        "success": False,
+                        "error": "被robots.txt阻止"
+                    }, project_id)
                 elif not result.markdown or not result.markdown.strip():
                     print(f"跳过 {result.url} - 内容为空")
+                    SystemService.send_to_websocket({
+                        "task_id": task_id,
+                        "type": "html_to_md_convert_progress",
+                        "status": "processing",
+                        "progress": progress_percent,
+                        "total": total_urls,
+                        "processed": processed_urls,
+                        "successful": successful_urls,
+                        "message": f"跳过URL: {result.url} - 内容为空",
+                        "url": result.url,
+                        "success": False,
+                        "error": "内容为空"
+                    }, project_id)
                 else:
                     print(f"爬取失败 {result.url}: {result.error_message}")
+                    SystemService.send_to_websocket({
+                        "task_id": task_id,
+                        "type": "html_to_md_convert_progress",
+                        "status": "processing",
+                        "progress": progress_percent,
+                        "total": total_urls,
+                        "processed": processed_urls,
+                        "successful": successful_urls,
+                        "message": f"爬取失败: {result.url}",
+                        "url": result.url,
+                        "success": False,
+                        "error": result.error_message
+                    }, project_id)
+
+        # 发送完成通知
+        SystemService.send_to_websocket({
+            "task_id": task_id,
+            "type": "html_to_md_convert_progress",
+            "status": "completed",
+            "progress": 100,
+            "total": total_urls,
+            "processed": processed_urls,
+            "successful": successful_urls,
+            "message": f"转换完成，共处理{processed_urls}个URL，成功{successful_urls}个"
+        }, project_id)
 
         return urls
 

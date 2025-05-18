@@ -174,10 +174,11 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, onMounted, onUnmounted } from 'vue';
 import { message, Modal } from 'ant-design-vue';
 import { ReloadOutlined  } from '@ant-design/icons-vue';
 import { crawlLinks, getCrawlStatus, convertToMarkdown, stopCrawl, deleteUrls } from '../services/crawler';
+import wsService from '../services/websocket';
 
 // 表单状态
 const formState = reactive({
@@ -255,7 +256,26 @@ const columns = [
 // 初始化
 onMounted(() => {
   fetchCrawlStatus();
+  
+  // 订阅WebSocket消息，监听URL转换为Markdown的进度
+  wsService.on('ws:html_to_md_convert_progress', handleConvertProgress);
 });
+
+// 组件卸载时移除事件监听
+onUnmounted(() => {
+  // 移除WebSocket监听
+  wsService.off('ws:html_to_md_convert_progress');
+});
+
+// 处理转换进度消息
+const handleConvertProgress = (data) => {
+  console.log('收到转换进度消息:', data);
+  
+  // 如果状态是completed或processing，自动刷新列表数据
+  if (data.status === 'completed' || (data.status === 'processing' && data.processed % 5 === 0)) {
+    fetchCrawlStatus();
+  }
+};
 
 // 开始爬取
 const startCrawl = async () => {
@@ -299,7 +319,7 @@ const startCrawl = async () => {
       crawlStatusType.value = 'info';
       
       // 5秒后自动刷新状态
-      setTimeout(fetchCrawlStatus, 5000);
+      setTimeout(fetchCrawlStatus, 3000);
     } else {
       message.error(response.message || '爬取任务启动失败');
       crawlStatus.value = '爬取任务启动失败';
@@ -443,8 +463,10 @@ const handleConvertConfirm = async () => {
     });
     
     if (response.status === 'success') {
-      message.success('转换任务已提交，请在文件管理中查看结果');
+      message.success('转换任务已提交，稍后更新进度结果');
       convertModalVisible.value = false;
+      
+      // 转换开始后，会通过WebSocket接收进度消息
     } else {
       message.error(response.message || '转换失败');
     }

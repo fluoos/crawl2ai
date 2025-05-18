@@ -50,7 +50,7 @@ npm install
 1. 启动后端服务器：
 
 ```bash
-uvicorn app.main:app --reload
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 --ws websockets
 ```
 
 2. 启动前端开发服务器：

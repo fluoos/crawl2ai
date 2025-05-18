@@ -31,6 +31,8 @@
         </a-menu-item>
       </a-menu>
       <div v-if="currentProject && !isProjectPage" class="project-info">
+        <notification-center v-if="currentProject" class="notification-center" />
+        
         <a-tooltip placement="bottom" title="返回项目管理">
           <a-button 
             type="primary" 
@@ -75,6 +77,8 @@ import {
   RollbackOutlined,
   ProjectOutlined
 } from '@ant-design/icons-vue';
+import NotificationCenter from '../common/NotificationCenter.vue';
+import wsService from '../../services/websocket';
 
 const route = useRoute();
 const router = useRouter();
@@ -97,9 +101,34 @@ watch(() => route.path, (newPath) => {
   if (!isProjectPage.value) {
     // 判断本地storage中是否存在当前项目信息，如果不存在，则跳转到项目管理页
     const projectStr = localStorage.getItem('currentProject');
-    currentProject.value = projectStr ? JSON.parse(projectStr) : null;
+    const newProject = projectStr ? JSON.parse(projectStr) : null;
+    
+    // 检查项目ID是否变化
+    const oldProjectId = currentProject.value?.id;
+    const newProjectId = newProject?.id;
+    
+    // 更新当前项目引用
+    currentProject.value = newProject;
+    console.log('currentProject.value', currentProject.value, wsService.isConnected);
+    
+    // 只有在项目ID变化时才重新连接WebSocket
+    if (newProjectId && (newProjectId !== oldProjectId || !wsService.isConnected)) {
+      try {
+        console.log(`项目ID: ${newProjectId}, 当前连接状态: ${wsService.isConnected ? '已连接' : '未连接'}`);
+        if (wsService.isConnected) {
+          // 如果连接了不同项目，需要先断开
+          if (wsService.projectId !== newProjectId) {
+            wsService.disconnect();
+          }
+        }
+        // 连接新项目
+        wsService.connect(newProjectId);
+      } catch (error) {
+        console.error('初始化WebSocket连接失败:', error);
+      }
+    }
   }
-});
+}, { immediate: true });
 </script>
 
 <style scoped>

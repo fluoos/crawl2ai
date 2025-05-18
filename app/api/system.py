@@ -1,8 +1,10 @@
-from fastapi import APIRouter, HTTPException, Path
+from fastapi import APIRouter, HTTPException, Path, WebSocket, WebSocketDisconnect, Depends
 from typing import Dict, Any, List, Optional
 from pydantic import BaseModel, Field
 from app.services.system_service import SystemService
 from app.core.config import settings
+from app.core.deps import get_api_key
+from app.core.websocket import manager
 
 router = APIRouter()
 
@@ -131,3 +133,77 @@ async def reset_file_strategy():
         return SystemService.reset_file_strategy()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.websocket("/ws/{project_id}")
+async def websocket_endpoint(websocket: WebSocket, project_id: str):
+    """建立WebSocket连接用于接收实时通知
+    
+    参数:
+    - project_id: 项目ID
+    """
+    import asyncio
+    import time
+    print(f"WebSocket连接请求 - 项目ID: {project_id}")
+    
+    try:
+        await manager.connect(websocket, project_id)
+        print(f"WebSocket连接已建立 - 项目ID: {project_id}")
+        
+        try:
+            # 发送一个连接成功消息
+            await websocket.send_json({
+                "type": "connection",
+                "status": "connected",
+                "project_id": project_id,
+                "timestamp": time.time()
+            })
+            
+            # 保持连接活跃
+            while True:
+                try:
+                    # 等待客户端消息，有超时机制
+                    data = await asyncio.wait_for(
+                        websocket.receive_json(), 
+                        timeout=120  # 2分钟超时
+                    )
+                    
+                    # 处理心跳请求
+                    if data.get('type') == 'heartbeat':
+                        await websocket.send_json({
+                            "type": "heartbeat_response",
+                            "status": "ok",
+                            "timestamp": time.time()
+                        })
+                        print(f"心跳响应已发送 - 项目ID: {project_id}")
+                    
+                except asyncio.TimeoutError:
+                    # 超时时发送ping消息
+                    await websocket.send_json({
+                        "type": "ping",
+                        "status": "ok",
+                        "timestamp": time.time()
+                    })
+                    print(f"Ping消息已发送 - 项目ID: {project_id}")
+                    
+        except WebSocketDisconnect:
+            print(f"WebSocket连接被客户端断开 - 项目ID: {project_id}")
+        except Exception as e:
+            print(f"WebSocket处理异常 - 项目ID: {project_id}, 错误: {str(e)}")
+    
+    except Exception as e:
+        print(f"WebSocket连接失败 - 项目ID: {project_id}, 错误: {str(e)}")
+    
+    finally:
+        # 确保连接被清理
+        manager.disconnect(websocket, project_id)
+        print(f"WebSocket连接已关闭并清理 - 项目ID: {project_id}")
+
+
+@router.post("/internal/send-ws-message")
+async def send_ws_message(data: dict, project_id: str):
+    """内部API：从子进程发送WebSocket消息"""
+    try:
+        await manager.send_json(data, project_id)
+        return {"status": "success"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
