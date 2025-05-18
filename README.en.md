@@ -125,7 +125,7 @@ npm run dev
 
 ## Input Data Format
 
-The input file `output/qa_dataset.jsonl` should be in JSONL format, with each line containing a JSON object that must include the following fields:
+The input file `qa_dataset.jsonl` should be in JSONL format, with each line containing a JSON object that must include the following fields:
 
 ```json
 {
