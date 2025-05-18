@@ -173,30 +173,123 @@ const showProgressNotification = (task_id, data) => {
   // 任务标题
   const title = getNotificationTitle(data);
   
+  // 状态颜色映射
+  const statusColors = {
+    completed: '#52c41a',
+    failed: '#f5222d',
+    processing: '#1890ff',
+    started: '#722ed1'
+  };
+  
+  // 获取当前状态颜色
+  const statusColor = statusColors[status] || statusColors.processing;
+  
   // 通知配置
   let notificationConfig = {
     key: `task-${task_id}`,
-    message: status === 'completed' ? '转换任务完成' : 
-             status === 'failed' ? '转换任务失败' :
-             status === 'started' ? '转换任务开始' :
-             `${title}：进度 ${percent}%`,
-    description: h('div', [
-      h('div', status === 'completed' ? data.message :
-               status === 'failed' ? data.message || '转换过程中出现错误' :
-               status === 'started' ? '任务已开始，请稍候...' :
-               `已处理: ${processed}/${total}，成功: ${successful}`),
+    message: h('div', { 
+      style: {
+        fontWeight: '500',
+        fontSize: '15px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px'
+      } 
+    }, [
+      status === 'completed' ? '✅ 转换任务完成' : 
+      status === 'failed' ? '❌ 转换任务失败' :
+      status === 'started' ? '🚀 转换任务开始' :
+      `🔄 ${title}：${percent}%`
+    ]),
+    description: h('div', {
+      style: {
+        marginTop: '8px'
+      }
+    }, [
+      // 进度信息
+      h('div', {
+        style: {
+          fontSize: '14px',
+          marginBottom: status !== 'completed' && status !== 'failed' ? '12px' : '0',
+          color: '#595959'
+        }
+      }, status === 'completed' ? data.message :
+          status === 'failed' ? data.message || '转换过程中出现错误' :
+          status === 'started' ? '任务准备中，即将开始...' :
+          [
+            h('span', {
+              style: {
+                color: statusColor,
+                fontWeight: 'bold'
+              }
+            }, `${processed}/${total} `),
+            '项已处理，',
+            h('span', {
+              style: {
+                color: '#52c41a', 
+                fontWeight: 'bold'
+              }
+            }, `${successful} `),
+            '项成功'
+          ]),
+      
+      // 进度条
       status !== 'completed' && status !== 'failed' ? 
-        h('a-progress', {
-          percent: percent,
-          status: getProgressStatus(status),
-          size: 'small',
-          style: 'margin-top: 8px;'
-        }) : null,
+        h('div', {
+          style: {
+            marginTop: '8px',
+            padding: '4px',
+            background: 'rgba(0,0,0,0.02)',
+            borderRadius: '4px'
+          }
+        }, [
+          h('a-progress', {
+            percent: percent,
+            status: getProgressStatus(status),
+            size: 'small',
+            strokeColor: statusColor,
+            trailColor: 'rgba(0,0,0,0.06)',
+            style: 'margin: 0;'
+          })
+        ]) : null,
+        
+      // 完成和失败时显示的时间提示
+      (status === 'completed' || status === 'failed') ?
+        h('div', {
+          style: {
+            fontSize: '12px',
+            color: '#8c8c8c',
+            marginTop: '8px',
+            fontStyle: 'italic'
+          }
+        }, '此消息将在6秒后自动关闭') : null
     ]),
     duration: status === 'completed' || status === 'failed' ? 6 : 0, // 完成或失败后6秒关闭
-    icon: () => status === 'completed' ? h(CheckCircleOutlined, { style: 'color: #52c41a' }) :
-                status === 'failed' ? h(CloseCircleOutlined, { style: 'color: #f5222d' }) :
-                h(LoadingOutlined, { style: 'color: #1890ff' }),
+    icon: () => h('div', {
+      style: {
+        width: '24px',
+        height: '24px',
+        borderRadius: '50%',
+        background: statusColor,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#ffffff',
+        fontSize: '12px',
+        boxShadow: `0 0 8px ${statusColor}66`
+      }
+    }, [
+      status === 'completed' ? h(CheckCircleOutlined) :
+      status === 'failed' ? h(CloseCircleOutlined) :
+      h(LoadingOutlined, { style: 'animation: spin 1.2s infinite linear;' })
+    ]),
+    style: {
+      borderLeft: `4px solid ${statusColor}`,
+      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+      backgroundColor: 'white'
+    },
+    class: 'custom-notification',
+    placement: 'topRight'
   };
   
   // 开启或更新通知
@@ -330,5 +423,48 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   height: 300px;
+}
+</style>
+
+<style>
+/* 全局样式，用于通知动画 */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.custom-notification {
+  overflow: hidden;
+  border-radius: 4px;
+  transition: all 0.3s cubic-bezier(0.645, 0.045, 0.355, 1);
+  animation: notificationFadeIn 0.3s ease;
+}
+
+@keyframes notificationFadeIn {
+  from { 
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to { 
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 优化Ant Design通知样式 */
+.ant-notification-notice-message {
+  margin-bottom: 0 !important;
+}
+
+.ant-notification-notice-description {
+  margin-left: 0 !important;  
+}
+
+.ant-notification-notice-with-icon .ant-notification-notice-message {
+  margin-left: 36px !important;
+}
+
+.ant-notification-notice-with-icon .ant-notification-notice-description {
+  margin-left: 36px !important;
 }
 </style> 
