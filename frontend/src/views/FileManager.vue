@@ -95,12 +95,13 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue';
-import { message, Modal, Tooltip } from 'ant-design-vue';
+import { ref, reactive, onMounted, onUnmounted } from 'vue';
+import { message, Modal } from 'ant-design-vue';
 import { ReloadOutlined } from '@ant-design/icons-vue';
 import DataTable from '../components/common/DataTable.vue';
 import FileUploader from '../components/common/FileUploader.vue';
 import { getFileList, convertToDataset, getFilePreview, deleteFiles } from '../services/files';
+import wsService from '../services/websocket';
 
 // 表格数据
 const fileList = ref([]);
@@ -162,7 +163,21 @@ const columns = [
 // 初始化
 onMounted(() => {
   fetchFileList();
+  wsService.on('ws:md_to_dataset_convert_progress', handleConvertProgress);
 });
+
+// 组件卸载时移除事件监听
+onUnmounted(() => {
+  wsService.off('ws:md_to_dataset_convert_progress');
+});
+
+// 处理转换进度消息
+const handleConvertProgress = (data) => {
+  // 如果状态是completed或processing，自动刷新列表数据
+  if (data.status === 'completed' || (data.status === 'processing' && data.processed % 5 === 0)) {
+    fetchFileList();
+  }
+};
 
 // 获取文件列表
 const fetchFileList = async () => {
@@ -171,8 +186,12 @@ const fetchFileList = async () => {
     const response = await getFileList(pagination.current, pagination.pageSize);
     
     if (response && response.files) {
-      fileList.value = response.files;
-      pagination.total = response.total || response.files.length;
+      const files = response.files.map(file => ({
+        ...file,
+        id: file.id || file.url
+      }));
+      fileList.value = files;
+      pagination.total = response.total || files.length;
     } else {
       fileList.value = [];
       pagination.total = 0;
@@ -251,7 +270,7 @@ const confirmConvert = async () => {
     );
     
     if (response && response.status === 'success') {
-      message.success('转换任务已提交，请在数据集管理中查看结果');
+      message.success('转换任务已提交，稍后更新进度结果');
       convertModalVisible.value = false;
     } else {
       message.error(response?.message || '转换失败');

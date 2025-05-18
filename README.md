@@ -50,7 +50,7 @@ npm install
 1. 启动后端服务器：
 
 ```bash
-uvicorn app.main:app --reload
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 --ws websockets
 ```
 
 2. 启动前端开发服务器：
@@ -126,7 +126,7 @@ npm run dev
 
 ## 输入数据格式
 
-输入文件 `output/qa_dataset.jsonl` 应为JSONL格式，每行包含一个JSON对象，要求包含以下字段：
+输入文件 `qa_dataset.jsonl` 应为JSONL格式，每行包含一个JSON对象，要求包含以下字段：
 
 ```json
 {

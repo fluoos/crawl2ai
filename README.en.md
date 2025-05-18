@@ -49,7 +49,7 @@ npm install
 1. Start the backend server:
 
 ```bash
-uvicorn app.main:app --reload
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 --ws websockets
 ```
 
 2. Start the frontend development server:
@@ -125,7 +125,7 @@ npm run dev
 
 ## Input Data Format
 
-The input file `output/qa_dataset.jsonl` should be in JSONL format, with each line containing a JSON object that must include the following fields:
+The input file `qa_dataset.jsonl` should be in JSONL format, with each line containing a JSON object that must include the following fields:
 
 ```json
 {
