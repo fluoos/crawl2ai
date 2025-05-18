@@ -99,6 +99,9 @@ const getNotificationTitle = (notification) => {
   if (notification.type === 'html_to_md_convert_progress') {
     return 'URL转换为Markdown';
   }
+  if (notification.type === 'md_to_dataset_convert_progress') {
+    return 'Markdown转换为数据集';
+  }
   return '系统通知';
 };
 
@@ -215,7 +218,7 @@ const showProgressNotification = (task_id, data) => {
         }
       }, status === 'completed' ? data.message :
           status === 'failed' ? data.message || '转换过程中出现错误' :
-          status === 'started' ? '任务准备中，即将开始...' :
+          status === 'started' ? data.message || '任务准备中，即将开始...' :
           [
             h('span', {
               style: {
@@ -348,11 +351,13 @@ const handleConvertProgress = (data) => {
 onMounted(() => {
   // 订阅WebSocket消息
   wsService.on('ws:html_to_md_convert_progress', handleConvertProgress);
+  wsService.on('ws:md_to_dataset_convert_progress', handleConvertProgress);
 });
 
 onUnmounted(() => {
   // 取消订阅
   wsService.off('ws:html_to_md_convert_progress');
+  wsService.off('ws:md_to_dataset_convert_progress');
 });
 </script>
 

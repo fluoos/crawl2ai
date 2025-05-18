@@ -801,7 +801,7 @@ class CrawlerService:
             else:
                 # 文件不存在，创建新的数组
                 registry_data = []
-            
+            count = len(registry_data)
             # 检查URL是否已存在
             url_exists = False
             for item in registry_data:
@@ -813,6 +813,7 @@ class CrawlerService:
             
             # 如果URL不存在，添加新记录
             if not url_exists:
+                file_record['id'] = count + 1
                 registry_data.append(file_record)
             
             # 保存更新后的注册表

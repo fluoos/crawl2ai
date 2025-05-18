@@ -4,12 +4,14 @@ import logging
 import shutil
 from typing import Dict, Any, List, Optional
 from datetime import datetime
+import uuid
 import aiohttp
 import asyncio
 from openai import OpenAI
 
 from app.core.config import settings
 from app.services.system_service import SystemService
+from app.core.websocket import manager
 
 # 常量定义 - 使用settings中的配置
 EXPORT_FORMATS = settings.SUPPORTED_FORMATS
@@ -415,6 +417,20 @@ class DatasetService:
         if project_id:
             task_key = f"{project_id}_{output_file}"
         conversion_state[task_key]["progress"] = 0
+        # 生成任务ID
+        task_id = str(uuid.uuid4())
+        # 发送初始进度更新
+        await manager.send_json({
+            "task_id": task_id,
+            "type": "md_to_dataset_convert_progress",
+            "status": "started",
+            "progress": 0,
+            "total": len(files),
+            "processed": 0,
+            "successful": 0,
+            "message": "开始调用大模型转换md文件为数据集, 转换速度取决于大模型的响应速度"
+        }, project_id)
+        print(f"开始调用大模型转换md文件为数据集, 项目ID: {project_id}")
         
         for i, file_path in enumerate(files):
             try:
@@ -453,8 +469,30 @@ class DatasetService:
                             if isinstance(qa_pair, dict) and "question" in qa_pair and "answer" in qa_pair:
                                 qa_pair["source"] = file_path
                                 results.append(qa_pair)
+                        # 更新进度
+                        await manager.send_json({
+                            "task_id": task_id,
+                            "type": "md_to_dataset_convert_progress",
+                            "status": "processing",
+                            "progress": i + 1,
+                            "total": len(files),
+                            "processed": i + 1,
+                            "successful": i + 1,
+                            "message": f"成功处理 {i + 1} 个文件，生成 {len(results)} 个数据"
+                        }, project_id)
                     else:
                         logging.warning(f"API返回的JSON缺少'qa_pairs'字段或格式不符合预期")
+                        # 更新进度
+                        await manager.send_json({
+                            "task_id": task_id,
+                            "type": "md_to_dataset_convert_progress",
+                            "status": "processing",
+                            "progress": i + 1,
+                            "total": len(files),
+                            "processed": i + 1,
+                            "successful": i + 1,
+                            "message": f"第{i + 1} 个文件，大模型返回的字段或格式不符合预期"
+                        }, project_id)
                 except json.JSONDecodeError as e:
                     logging.error(f"JSON解析错误: {str(e)}, 内容: {generated_text}")
                     
@@ -485,6 +523,17 @@ class DatasetService:
                             "source": file_path,
                             "label": "未分类"
                         })
+                        # 更新进度
+                        await manager.send_json({
+                            "task_id": task_id,
+                            "type": "md_to_dataset_convert_progress",
+                            "status": "processing",
+                            "progress": i + 1,
+                            "total": len(files),
+                            "processed": i + 1,
+                            "successful": i + 1,
+                            "message": f"成功处理 {i + 1} 个文件，生成 {len(results)} 个数据"
+                        }, project_id)
                 
                 # 更新进度
                 conversion_state[task_key]["progress"] = i + 1
@@ -494,6 +543,17 @@ class DatasetService:
                 
             except Exception as e:
                 logging.error(f"处理文件 {file_path} 时出错: {str(e)}")
+                # 更新进度
+                await manager.send_json({
+                    "task_id": task_id,
+                    "type": "md_to_dataset_convert_progress",
+                    "status": "processing",
+                    "progress": i + 1,
+                    "total": len(files),
+                    "processed": i + 1,
+                    "successful": i + 1,
+                    "message": f"处理文件第{i + 1} 个文件时出错"
+                }, project_id)
         
         # 确保输出目录存在并以追加模式写入文件
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
@@ -508,6 +568,17 @@ class DatasetService:
         DatasetService.add_missing_ids(output_file, project_id)
         
         print(f"提取了 {len(results)} 个问答对")
+        # 更新进度
+        await manager.send_json({
+            "task_id": task_id,
+            "type": "md_to_dataset_convert_progress",
+            "status": "completed",
+            "progress": len(files),
+            "total": len(files),
+            "processed": len(files),
+            "successful": len(files),
+            "message": f"成功提取 {len(results)} 数据"
+        }, project_id)
         return output_path
     
     @staticmethod
