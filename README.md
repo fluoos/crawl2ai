@@ -26,35 +26,35 @@
   <tr>
     <td align="center" width="33%">
       <img src="./docs/images/home01.png" alt="项目管理" style="max-width: 100%;">
-      <br><b>项目管理</b>
+      <br><small>项目管理</small>
     </td>
     <td align="center" width="33%">
       <img src="./docs/images/link01.png" alt="链接管理" style="max-width: 100%;">
-      <br><b>链接管理</b>
+      <br><small>链接管理</small>
     </td>
     <td align="center" width="33%">
       <img src="./docs/images/link02.png" alt="Md文件转换" style="max-width: 100%;">
-      <br><b>Md文件转换</b>
+      <br><small>Md文件转换</small>
     </td>
   </tr>
   <tr>
     <td align="center" width="33%">
       <img src="./docs/images/files01.png" alt="文件管理" style="max-width: 100%;">
-      <br><b>文件管理</b>
+      <br><small>文件管理</small>
     </td>
     <td align="center" width="33%">
       <img src="./docs/images/files02.png" alt="文件转换成数据集" style="max-width: 100%;">
-      <br><b>文件转换成数据集</b>
+      <br><small>文件转换成数据集</small>
     </td>
     <td align="center" width="33%">
       <img src="./docs/images/dataset01.png" alt="数据管理" style="max-width: 100%;">
-      <br><b>数据管理</b>
+      <br><small>数据管理</small>
     </td>
   </tr>
   <tr>
     <td align="center" width="33%">
       <img src="./docs/images/system01.png" alt="系统设置" style="max-width: 100%;">
-      <br><b>系统设置</b>
+      <br><small>系统设置</small>
     </td>
     <td align="center" width="33%">
     </td>
