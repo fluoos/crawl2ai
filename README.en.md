@@ -1,6 +1,6 @@
 <div align="center">
 
-**A powerful Dataset Generation and Large Model Fine-tuning Tool**
+**A Powerful Large Model Dataset Generation Tool**
 
 [简体中文](./README.md) | [English](./README.en.md)
 
@@ -8,18 +8,60 @@
 
 # Dataset Generation and Large Model Fine-tuning Tool
 
-A tool for large model dataset generation and fine-tuning, enabling one-click crawling of links from specified domains, converting links into large model-friendly markdown files, and transforming markdown files into datasets suitable for training large models using ChatGPT, Deepseek, Gemma, and other LLMs.
+A tool for large model dataset generation and fine-tuning, enabling one-click crawling of links from specified domains, converting links into large model-friendly Markdown files, and transforming Markdown files into datasets suitable for training large models using ChatGPT, Deepseek, Gemma, and other LLMs.
 
 ## Features
 
 - Support for deep crawling of all links from specified domains
-- Support for converting links into large model-friendly markdown files
+- Support for converting links into large model-friendly Markdown files
 - Support for uploading .md, .txt, .pdf, .docx, .doc and other files, with automatic conversion to .md files
-- Support for converting markdown files into datasets suitable for training large models using DeepSeek, ChatGPT, Gemma, and other large models
-- Support for exporting in both JSONL and JSON formats
-- Support for exporting in Alpaca, ShareGPT, and custom formats
+- Support for converting Markdown files into datasets suitable for training large models using DeepSeek, ChatGPT, Gemma, and other large models
+- Support for custom adding, editing, and modifying of dataset data
+- Support for exporting in JSONL and JSON formats, with Alpaca, ShareGPT, and custom formats
 - Support for previewing conversion results
-- Future support for direct fine-tuning of large models
+
+## Screenshots
+
+<table>
+  <tr>
+    <td align="center" width="33%">
+      <img src="./docs/images/home01.png" alt="Project Management" style="max-width: 100%;">
+      <br><b>Project Management</b>
+    </td>
+    <td align="center" width="33%">
+      <img src="./docs/images/link01.png" alt="Link Management" style="max-width: 100%;">
+      <br><b>Link Management</b>
+    </td>
+    <td align="center" width="33%">
+      <img src="./docs/images/link02.png" alt="Md File Conversion" style="max-width: 100%;">
+      <br><b>Md File Conversion</b>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="33%">
+      <img src="./docs/images/files01.png" alt="File Management" style="max-width: 100%;">
+      <br><b>File Management</b>
+    </td>
+    <td align="center" width="33%">
+      <img src="./docs/images/files02.png" alt="File to Dataset Conversion" style="max-width: 100%;">
+      <br><b>File to Dataset Conversion</b>
+    </td>
+    <td align="center" width="33%">
+      <img src="./docs/images/dataset01.png" alt="Data Management" style="max-width: 100%;">
+      <br><b>Data Management</b>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="33%">
+      <img src="./docs/images/system01.png" alt="System Settings" style="max-width: 100%;">
+      <br><b>System Settings</b>
+    </td>
+    <td align="center" width="33%">
+    </td>
+    <td align="center" width="33%">
+    </td>
+  </tr>
+</table>
 
 ## Quick Start
 
@@ -123,7 +165,7 @@ npm run dev
 └── requirements.txt        # Python dependencies file
 ```
 
-## Input Data Format
+## Data Format
 
 The input file `qa_dataset.jsonl` should be in JSONL format, with each line containing a JSON object that must include the following fields:
 
