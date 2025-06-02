@@ -76,12 +76,15 @@ const notifications = ref([]);
 // 通知分组
 const notificationArr = computed(() => {
   return notifications.value.map(notification => {
+    // 计算正确的百分比进度
+    const progressPercent = notification.total > 0 ? Math.round((notification.processed / notification.total) * 100) : 0;
+    
     return {
       task_id: notification.task_id,
       type: notification.type,
       title: getNotificationTitle(notification),
       status: notification.status,
-      progress: notification.progress || 0,
+      progress: progressPercent, // 使用计算后的百分比
       total: notification.total || 0,
       processed: notification.processed || 0,
       successful: notification.successful || 0,
