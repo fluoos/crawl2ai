@@ -26,35 +26,35 @@ A tool for large model dataset generation and fine-tuning, enabling one-click cr
   <tr>
     <td align="center" width="33%">
       <img src="./docs/images/home01.png" alt="Project Management" style="max-width: 100%;">
-      <br><b>Project Management</b>
+      <br><small>Project Management</small>
     </td>
     <td align="center" width="33%">
       <img src="./docs/images/link01.png" alt="Link Management" style="max-width: 100%;">
-      <br><b>Link Management</b>
+      <br><small>Link Management</small>
     </td>
     <td align="center" width="33%">
       <img src="./docs/images/link02.png" alt="Md File Conversion" style="max-width: 100%;">
-      <br><b>Md File Conversion</b>
+      <br><small>Md File Conversion</small>
     </td>
   </tr>
   <tr>
     <td align="center" width="33%">
       <img src="./docs/images/files01.png" alt="File Management" style="max-width: 100%;">
-      <br><b>File Management</b>
+      <br><small>File Management</small>
     </td>
     <td align="center" width="33%">
       <img src="./docs/images/files02.png" alt="File to Dataset Conversion" style="max-width: 100%;">
-      <br><b>File to Dataset Conversion</b>
+      <br><small>File to Dataset Conversion</small>
     </td>
     <td align="center" width="33%">
       <img src="./docs/images/dataset01.png" alt="Data Management" style="max-width: 100%;">
-      <br><b>Data Management</b>
+      <br><small>Data Management</small>
     </td>
   </tr>
   <tr>
     <td align="center" width="33%">
       <img src="./docs/images/system01.png" alt="System Settings" style="max-width: 100%;">
-      <br><b>System Settings</b>
+      <br><small>System Settings</small>
     </td>
     <td align="center" width="33%">
     </td>
