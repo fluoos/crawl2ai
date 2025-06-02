@@ -387,7 +387,7 @@ class SystemService:
         ]
     }
 
-    请按照上述JSON格式，将用户提供的文本内容转换为多个问答对。
+    请按照上述JSON格式,注意一定要严格按照JSON格式返回, 返回前先检查是否符合JSON格式。
     """
         }
             SystemService._write_json_file(SystemService.PROMPTS_CONFIG_FILE, default_prompts)

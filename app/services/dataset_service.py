@@ -410,7 +410,7 @@ class DatasetService:
         
         # 获取提示词
         prompt = SystemService.get_prompts()
-        system_prompt = prompt.get("data", "")
+        system_prompt = prompt.get("data", "") + '\n确保JSON结构完整，所有括号和引号都正确闭合。如果内容过长，请分段但保持JSON结构完整性。'
         
         # 初始化转换状态
         task_key = output_file
@@ -449,8 +449,16 @@ class DatasetService:
                     stream=False
                 )
                 generated_text = response.choices[0].message.content
-                
-                # 解析JSON响应
+                finish_reason = response.choices[0].finish_reason
+                print(f"获取到大模型的第 {i + 1} 个文件结果，长度为: {len(generated_text)}")
+                # 如果该值为 length，则表明当前模型生成内容所包含的 Tokens 数量超过请求中的 max_tokens 参数
+                print(f"finish_reason: {finish_reason}")
+                # 检查返回结果是否完整
+                if not generated_text:
+                    logging.warning(f"大模型返回空内容，跳过文件: {file_path}")
+                    continue
+
+                # 解析JSON响应，先简单处理返回的格式问题，如果返回的JSON格式不正确，则尝试多次修复
                 try:
                     # 去除可能的Markdown代码块标记
                     if generated_text.startswith("```"):
@@ -460,16 +468,25 @@ class DatasetService:
                         if first_ticks != -1 and last_ticks != -1:
                             # 提取```之间的内容
                             generated_text = generated_text[first_ticks+1:last_ticks].strip()
-                        
+
+                    # 检查返回结果是否被截断
+                    is_truncated = not generated_text.strip().endswith('}') and '{' in generated_text
+                    if is_truncated:
+                        print(f"检测到第 {i + 1} 个文件的返回结果可能被截断，尝试修复...")
+                        logging.warning(f"大模型返回结果可能被截断: 文件 {file_path}")
+                        generated_text = DatasetService.fix_truncated_json(generated_text)
                     result = json.loads(generated_text)
                     
                     # 处理qa_pairs字段
                     if 'qa_pairs' in result and isinstance(result['qa_pairs'], list):
                         for qa_pair in result['qa_pairs']:
                             if isinstance(qa_pair, dict) and "question" in qa_pair and "answer" in qa_pair:
-                                qa_pair["source"] = file_path
-                                results.append(qa_pair)
+                                # 标准化处理QA对字段
+                                standardized_qa_pair = DatasetService.standardize_qa_pair(qa_pair)
+                                standardized_qa_pair["source"] = file_path
+                                results.append(standardized_qa_pair)
                         # 更新进度
+                        print(f"成功处理第 {i + 1} 个文件，生成 {len(results)} 个数据")
                         await manager.send_json({
                             "task_id": task_id,
                             "type": "md_to_dataset_convert_progress",
@@ -478,7 +495,7 @@ class DatasetService:
                             "total": len(files),
                             "processed": i + 1,
                             "successful": i + 1,
-                            "message": f"成功处理 {i + 1} 个文件，生成 {len(results)} 个数据"
+                            "message": f"成功处理第 {i + 1} 个文件，生成 {len(results)} 个数据"
                         }, project_id)
                     else:
                         logging.warning(f"API返回的JSON缺少'qa_pairs'字段或格式不符合预期")
@@ -494,9 +511,40 @@ class DatasetService:
                             "message": f"第{i + 1} 个文件，大模型返回的字段或格式不符合预期"
                         }, project_id)
                 except json.JSONDecodeError as e:
-                    logging.error(f"JSON解析错误: {str(e)}, 内容: {generated_text}")
+                    logging.error(f"JSON解析错误: {str(e)}")
                     
-                    # 尝试基本的问答提取
+                    # 尝试更高级的JSON修复
+                    try:
+                        print(f"成功修复并处理第 {i + 1} 个文件：{generated_text}")
+                        fixed_json = DatasetService.fix_complex_json_format(generated_text)
+                        result = json.loads(fixed_json)
+                        # print(f"成功修复并处理第 {i + 1} 个文件：{result}")
+                        
+                        # 处理qa_pairs字段
+                        if 'qa_pairs' in result and isinstance(result['qa_pairs'], list):
+                            for qa_pair in result['qa_pairs']:
+                                if isinstance(qa_pair, dict) and "question" in qa_pair and "answer" in qa_pair:
+                                    # 标准化处理QA对字段
+                                    standardized_qa_pair = DatasetService.standardize_qa_pair(qa_pair)
+                                    standardized_qa_pair["source"] = file_path
+                                    results.append(standardized_qa_pair)
+                            # 更新进度
+                            print(f"成功修复并处理第 {i + 1} 个文件，生成 {len(results)} 个数据")
+                            await manager.send_json({
+                                "task_id": task_id,
+                                "type": "md_to_dataset_convert_progress",
+                                "status": "processing",
+                                "progress": i + 1,
+                                "total": len(files),
+                                "processed": i + 1,
+                                "successful": i + 1,
+                                "message": f"成功修复并处理第 {i + 1} 个文件，生成 {len(results)} 个数据"
+                            }, project_id)
+                            continue
+                    except Exception:
+                        pass
+                    
+                    # 如果JSON修复失败，回退到基本的问答提取
                     questions = []
                     answers = []
                     current_answer = ""
@@ -517,12 +565,15 @@ class DatasetService:
                     
                     # 将提取的问答对添加到结果中
                     for i in range(min(len(questions), len(answers))):
-                        results.append({
+                        qa_pair = {
                             "question": questions[i],
                             "answer": answers[i],
                             "source": file_path,
                             "label": "未分类"
-                        })
+                        }
+                        # 标准化处理QA对字段
+                        standardized_qa_pair = DatasetService.standardize_qa_pair(qa_pair)
+                        results.append(standardized_qa_pair)
                         # 更新进度
                         await manager.send_json({
                             "task_id": task_id,
@@ -953,3 +1004,380 @@ class DatasetService:
         with open(file_path, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
         return True
+    
+    @staticmethod
+    def fix_json_format(json_text):
+        """修复常见的JSON格式问题"""
+        import re
+        
+        # 如果输入为空，返回有效的空JSON对象
+        if not json_text or not json_text.strip():
+            return "{}"
+            
+        # 1. 替换单引号为双引号
+        result = json_text.replace("'", "\"")
+        
+        # 2. 确保属性名使用双引号
+        result = re.sub(r'([{,])\s*([a-zA-Z0-9_]+)\s*:', r'\1"\2":', result)
+        
+        # 3. 修复尾部逗号问题
+        result = re.sub(r',\s*}', '}', result)
+        result = re.sub(r',\s*]', ']', result)
+        
+        # 4. 删除注释
+        result = re.sub(r'//.*?\n', '\n', result)
+        result = re.sub(r'/\*.*?\*/', '', result, flags=re.DOTALL)
+        
+        # 5. 全面处理无效的控制字符（包括不可见控制字符和无效Unicode）
+        # 仅保留合法的字符：可打印字符、换行、回车、制表符
+        result = ''.join(ch for ch in result if (ch >= ' ' and ord(ch) < 127) or ch in ['\n', '\r', '\t'])
+        
+        # 6. 替换不规范的转义序列
+        result = re.sub(r'\\([^"\\/bfnrtu])', r'\1', result)
+        
+        # 7. 修复常见编码问题，替换非ASCII字符
+        result = re.sub(r'[\x80-\xff]', ' ', result)
+        
+        # 8. 修复缺少逗号的问题 - 在任何一个右括号或右引号后面跟着左引号的地方插入逗号
+        result = re.sub(r'([\}\]])\s*(\")', r'\1,\2', result)
+        result = re.sub(r'(\")(\s*\"[^\"]*\":\s*)', r'\1,\2', result)  # "key": "value" "key2": "value2" => "key": "value", "key2": "value2"
+        
+        return result
+    
+    @staticmethod
+    def fix_truncated_json(json_text):
+        """修复被截断的JSON字符串"""
+        import re
+        
+        if not json_text:
+            return json_text
+        
+        # 移除首尾空白
+        json_text = json_text.strip()
+        
+        # 如果JSON以{开始但没有以}结束，说明可能被截断
+        if json_text.startswith('{') and not json_text.endswith('}'):
+            # 尝试找到最后一个完整的对象或数组
+            
+            # 1. 找到最后一个完整的键值对
+            last_complete_pair_pos = -1
+            brace_count = 0
+            in_string = False
+            escape_next = False
+            
+            for i, char in enumerate(json_text):
+                if escape_next:
+                    escape_next = False
+                    continue
+                    
+                if char == '\\':
+                    escape_next = True
+                    continue
+                    
+                if char == '"' and not escape_next:
+                    in_string = not in_string
+                    continue
+                    
+                if in_string:
+                    continue
+                    
+                if char == '{':
+                    brace_count += 1
+                elif char == '}':
+                    brace_count -= 1
+                    if brace_count == 1:  # 回到主对象层级
+                        last_complete_pair_pos = i
+                elif char == ',' and brace_count == 1:
+                    last_complete_pair_pos = i
+            
+            # 2. 如果找到了最后完整的位置，截断到那里
+            if last_complete_pair_pos > 0:
+                # 检查最后是否是逗号，如果是则移除它
+                truncated = json_text[:last_complete_pair_pos].rstrip()
+                if truncated.endswith(','):
+                    truncated = truncated[:-1]
+                json_text = truncated
+            
+            # 3. 处理未闭合的字符串
+            quote_count = json_text.count('"')
+            # 计算转义字符的影响
+            escaped_quotes = len(re.findall(r'\\"', json_text))
+            actual_quotes = quote_count - escaped_quotes
+            
+            if actual_quotes % 2 != 0:
+                # 有未闭合的字符串，在适当位置添加闭合引号
+                json_text += '"'
+            
+            # 4. 添加缺失的右花括号和方括号
+            open_braces = json_text.count('{') - json_text.count('}')
+            open_brackets = json_text.count('[') - json_text.count(']')
+            
+            # 先闭合数组，再闭合对象
+            json_text += ']' * open_brackets
+            json_text += '}' * open_braces
+            
+        return json_text
+    
+    @staticmethod
+    def fix_complex_json_format(json_text):
+        """处理更复杂的JSON格式问题"""
+        print(f"仍然解析失败，尝试提取文本中的问答对")
+        import re
+        
+        # 0. 尝试保存原始输入，以便在所有修复尝试失败时使用基本文本提取
+        original_text = json_text
+
+        # 1. 首先应用基本修复
+        result = DatasetService.fix_json_format(json_text)
+        
+        # 2. 尝试从文本中提取JSON部分
+        # 查找 { 开始到最后一个 } 的内容
+        json_match = re.search(r'({.*})', result, re.DOTALL)
+        if json_match:
+            result = json_match.group(1)
+        
+        # 3. 检查并补全缺失的引号
+        # 查找可能缺少引号的键
+        result = re.sub(r'([{,])\s*([a-zA-Z0-9_]+)\s*:', r'\1"\2":', result)
+        
+        # 4. 修复未终止的字符串（如果引号数量为奇数）
+        # 计算双引号出现次数
+        quote_count = result.count('"')
+        if quote_count % 2 != 0:
+            # 找到最后一个未闭合的引号位置
+            open_quotes = []
+            for i, char in enumerate(result):
+                if char == '"' and (i == 0 or result[i-1] != '\\'):
+                    if len(open_quotes) == 0:
+                        open_quotes.append(i)
+                    else:
+                        open_quotes.pop()
+            
+            # 如果存在未闭合的引号，在其后添加一个闭合引号
+            if open_quotes:
+                last_open = open_quotes[-1]
+                next_comma = result.find(',', last_open)
+                next_closing = result.find('}', last_open)
+                next_bracket = result.find(']', last_open)
+                
+                insertion_point = len(result)
+                if next_comma > 0:
+                    insertion_point = min(insertion_point, next_comma)
+                if next_closing > 0:
+                    insertion_point = min(insertion_point, next_closing)
+                if next_bracket > 0:
+                    insertion_point = min(insertion_point, next_bracket)
+                
+                result = result[:insertion_point] + '"' + result[insertion_point:]
+        
+        # 5. 添加缺失的逗号
+        # 更复杂的逗号修复 - 使用正则表达式查找缺失逗号的模式
+        # 在右括号或引号后面跟着左引号的地方添加逗号
+        result = re.sub(r'(["\d}])\s*(")', r'\1,\2', result)
+        # 修复JSON对象中键值对之间缺少的逗号
+        result = re.sub(r'(:\s*["\w\d.\[\]{}]+)\s+(")', r'\1,\2', result)
+        
+        # 5.5 修复缺少冒号分隔符的情况 - 处理 "Expecting ':' delimiter" 错误
+        # 查找键名后面缺少冒号的模式
+        result = re.sub(r'(["]\s*[a-zA-Z0-9_]+\s*["]\s*)(\s*["{[])', r'\1:\2', result)
+        # 查找键值对中间缺少冒号的模式 - 引号内的键名与引号值之间
+        result = re.sub(r'(["]\s*[a-zA-Z0-9_]+\s*["]\s*)([^:{\[])', r'\1:\2', result)
+        # 处理无引号的键名和值之间缺少冒号的情况
+        result = re.sub(r'([a-zA-Z0-9_"]+)\s+([a-zA-Z0-9_"{[])', r'\1:\2', result)
+        
+        # 6. 修复嵌套结构中的错误
+        # 添加缺失的右括号
+        # 计算左右括号数量
+        left_braces = result.count('{')
+        right_braces = result.count('}')
+        if left_braces > right_braces:
+            result += '}' * (left_braces - right_braces)
+        
+        # 计算左右方括号数量
+        left_brackets = result.count('[')
+        right_brackets = result.count(']')
+        if left_brackets > right_brackets:
+            result += ']' * (left_brackets - right_brackets)
+        
+        # 7. 如果JSON格式仍有问题，尝试提取问答对
+        try:
+            # 尝试解析修复后的结果
+            json.loads(result)
+        except Exception:
+            # 如果仍然解析失败，尝试提取文本中的问答对
+            try:
+                # 清除之前的修复尝试，从原始文本中提取问答对
+                qa_pairs = DatasetService.extract_qa_pairs_from_text(original_text)
+                if qa_pairs:
+                    return json.dumps({"qa_pairs": qa_pairs}, ensure_ascii=False)
+            except Exception:
+                pass
+        
+        # 8. 最后，尝试一次自动修复 - 将结果解析为Python对象然后重新序列化为JSON
+        try:
+            # 尝试解析修复后的结果
+            parsed_data = json.loads(result)
+            # 然后重新序列化为标准JSON，确保格式正确
+            result = json.dumps(parsed_data, ensure_ascii=False)
+        except Exception:
+            # 如果仍然解析失败，保留现有的修复结果
+            pass
+        
+        return result
+
+    @staticmethod
+    def extract_qa_pairs_from_text(text):
+        """从非JSON文本中提取问答对"""
+        import re
+        
+        # 如果文本为空，返回空列表
+        if not text or not text.strip():
+            return []
+        
+        qa_pairs = []
+        
+        # 首先尝试使用常见问答格式（问题：答案：）
+        questions = []
+        answers = []
+        current_answer = ""
+        current_question = None
+        
+        # 处理中文冒号和英文冒号
+        for line in text.split('\n'):
+            # 去除首尾空白
+            line = line.strip()
+            if not line:
+                continue
+                
+            # 检查是否是问题行
+            q_match = re.search(r'^(问题|Q|Question)[:：]?\s*(.*)', line, re.IGNORECASE)
+            if q_match:
+                # 如果已有问题和答案，保存前一对
+                if current_question and current_answer:
+                    qa_pairs.append({
+                        "question": current_question.strip(),
+                        "answer": current_answer.strip()
+                    })
+                
+                # 开始新的问答对
+                current_question = q_match.group(2).strip()
+                current_answer = ""
+                continue
+                
+            # 检查是否是答案行
+            a_match = re.search(r'^(答案|A|Answer)[:：]?\s*(.*)', line, re.IGNORECASE)
+            if a_match:
+                # 如果已有问题，设置答案
+                if current_question:
+                    current_answer = a_match.group(2).strip()
+                continue
+                
+            # 如果不是问题或答案开头，添加到当前答案
+            if current_question and line:
+                if current_answer:
+                    current_answer += " " + line
+                else:
+                    current_answer = line
+        
+        # 添加最后一对问答
+        if current_question and current_answer:
+            qa_pairs.append({
+                "question": current_question.strip(),
+                "answer": current_answer.strip()
+            })
+        
+        # 如果没有找到问答对，尝试其他提取方法
+        if not qa_pairs:
+            # 寻找可能的问题-答案模式
+            pairs = re.findall(r'["《]([^"》]+)["》][：:]\s*["《]([^"》]+)["》]', text)
+            for q, a in pairs:
+                qa_pairs.append({
+                    "question": q.strip(),
+                    "answer": a.strip()
+                })
+        
+        return qa_pairs
+
+    # 添加新的静态方法用于标准化问答对字段
+    @staticmethod
+    def standardize_qa_pair(qa_pair: Dict) -> Dict:
+        """
+        标准化处理问答对字段，确保字段名称正确映射
+        
+        参数:
+        - qa_pair: 原始问答对字典
+        
+        返回:
+        - 标准化后的问答对字典
+        """
+        # 创建一个新的字典用于存储标准化字段
+        result = {}
+        
+        # 1. 处理问题字段 - 尝试多种可能的键名
+        question_key = None
+        for key in ["question", "prompt", "instruction", "query", "问题", "q", "Q"]:
+            if key in qa_pair:
+                question_key = key
+                break
+        
+        if question_key:
+            result["question"] = qa_pair[question_key]
+        else:
+            # 如果找不到问题字段，使用空字符串
+            result["question"] = ""
+        
+        # 2. 处理答案字段 - 尝试多种可能的键名
+        answer_key = None
+        for key in ["answer", "response", "output", "completion", "答案", "a", "A"]:
+            if key in qa_pair:
+                answer_key = key
+                break
+        
+        if answer_key:
+            result["answer"] = qa_pair[answer_key]
+        else:
+            # 如果找不到答案字段，使用空字符串
+            result["answer"] = ""
+        
+        # 3. 处理标签字段 - 尝试多种可能的键名
+        label_key = None
+        for key in ["label", "category", "tag", "type", "标签", "分类"]:
+            if key in qa_pair:
+                label_key = key
+                break
+        
+        if label_key:
+            result["label"] = qa_pair[label_key]
+        elif "metadata" in qa_pair and isinstance(qa_pair["metadata"], dict) and "label" in qa_pair["metadata"]:
+            # 检查元数据中是否有标签
+            result["label"] = qa_pair["metadata"]["label"]
+        else:
+            # 如果找不到标签字段，设为未分类
+            result["label"] = "未分类"
+        
+        # 4. 处理思维链字段
+        cot_key = None
+        for key in ["chainOfThought", "chain_of_thought", "reasoning", "思考过程", "分析"]:
+            if key in qa_pair:
+                cot_key = key
+                break
+        
+        if cot_key:
+            result["chainOfThought"] = qa_pair[cot_key]
+        else:
+            result["chainOfThought"] = ""
+        
+        # 5. 保留源文件信息
+        if "source" in qa_pair:
+            result["source"] = qa_pair["source"]
+        
+        # 6. 保留ID (如果存在)
+        if "id" in qa_pair:
+            result["id"] = qa_pair["id"]
+        
+        # 7. 添加时间戳 (如果不存在)
+        if "timestamp" not in qa_pair:
+            result["timestamp"] = datetime.now().isoformat()
+        else:
+            result["timestamp"] = qa_pair["timestamp"]
+        return result

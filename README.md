@@ -1,6 +1,6 @@
 <div align="center">
 
-**一个强大的数据集生成和大模型微调工具**
+**一个强大的大模型数据集生成工具**
 
 [简体中文](./README.md) | [English](./README.en.md)
 
@@ -8,19 +8,60 @@
 
 # 数据集生成、大模型微调工具
 
-大模型数据集生成和微调工具，一键爬取指定域名的链接，支持把链接转换成大模型友好的markdown文件，支持将markdown文件通过ChatGPT、deepseek、Gemma等大模型转换成训练大模型可用的数据集。
+大模型数据集生成和微调工具，一键爬取指定域名的链接，支持把链接转换成大模型友好的Markdown文件，支持将Markdown文件通过ChatGPT、Deepseek、Gemma等大模型转换成训练大模型可用的数据集。
 
 ## 功能特点
 
 - 支持深度爬取指定域名的所有链接
-- 支持将链接转换成大模型友好的markdown文件
+- 支持将链接转换成大模型友好的Markdown文件
 - 支持上传.md、.txt、.pdf、.docx、.doc等文件，自动转换成.md文件
-- 支持通过DeepSeek、ChatGPT、Gemma等大模型将markdown转换成训练大模型可用的数据集
-- 支持导出 JSONL 和 JSON 两种输出格式
-- 支持导出 Alpaca、ShareGPT 和自定义格式
+- 支持通过DeepSeek、ChatGPT、Gemma等大模型将Markdown转换成训练大模型可用的数据集
+- 支持数据集数据的自定义增加、编辑、修改
+- 支持导出 JSONL 和 JSON 两种输出格式，Alpaca、ShareGPT 和自定义格式
 - 支持预览转换结果
-- 未来支持直接微调大模型
 
+## 功能截图
+
+<table>
+  <tr>
+    <td align="center" width="33%">
+      <img src="./docs/images/home01.png" alt="项目管理" style="max-width: 100%;">
+      <br><b>项目管理</b>
+    </td>
+    <td align="center" width="33%">
+      <img src="./docs/images/link01.png" alt="链接管理" style="max-width: 100%;">
+      <br><b>链接管理</b>
+    </td>
+    <td align="center" width="33%">
+      <img src="./docs/images/link02.png" alt="Md文件转换" style="max-width: 100%;">
+      <br><b>Md文件转换</b>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="33%">
+      <img src="./docs/images/files01.png" alt="文件管理" style="max-width: 100%;">
+      <br><b>文件管理</b>
+    </td>
+    <td align="center" width="33%">
+      <img src="./docs/images/files02.png" alt="文件转换成数据集" style="max-width: 100%;">
+      <br><b>文件转换成数据集</b>
+    </td>
+    <td align="center" width="33%">
+      <img src="./docs/images/dataset01.png" alt="数据管理" style="max-width: 100%;">
+      <br><b>数据管理</b>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="33%">
+      <img src="./docs/images/system01.png" alt="系统设置" style="max-width: 100%;">
+      <br><b>系统设置</b>
+    </td>
+    <td align="center" width="33%">
+    </td>
+    <td align="center" width="33%">
+    </td>
+  </tr>
+</table>
 
 ## 快速开始
 
@@ -124,7 +165,7 @@ npm run dev
 └── requirements.txt        # Python依赖文件
 ```
 
-## 输入数据格式
+## 大模型返回数据格式
 
 输入文件 `qa_dataset.jsonl` 应为JSONL格式，每行包含一个JSON对象，要求包含以下字段：
 

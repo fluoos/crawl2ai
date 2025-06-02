@@ -188,7 +188,7 @@ const fetchFileList = async () => {
     if (response && response.files) {
       const files = response.files.map(file => ({
         ...file,
-        id: file.id || file.url
+        id: file.id || file.url || file.filename
       }));
       fileList.value = files;
       pagination.total = response.total || files.length;
