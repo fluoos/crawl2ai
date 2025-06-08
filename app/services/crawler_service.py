@@ -22,6 +22,9 @@ from app.utils.path_utils import (
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, BrowserConfig, MemoryAdaptiveDispatcher, CrawlerMonitor, DisplayMode
 from crawl4ai.deep_crawling import BFSDeepCrawlStrategy, DFSDeepCrawlStrategy
 
+# 导入智能分段工具
+from app.core.markdown_splitter import MarkdownSplitter
+
 
 class CrawlerService:
     """爬虫服务类，提供爬虫相关的业务逻辑"""
@@ -268,6 +271,10 @@ class CrawlerService:
         urls: List[str],
         included_selector: Optional[str] = None,
         excluded_selector: Optional[str] = None,
+        enable_smart_split: bool = False,
+        max_tokens: Optional[int] = 8000,
+        min_tokens: Optional[int] = 500,
+        split_strategy: Optional[str] = "balanced",
         project_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """启动URL转换为Markdown的进程"""
@@ -294,6 +301,10 @@ class CrawlerService:
                     output_dir,
                     included_selector,
                     excluded_selector,
+                    enable_smart_split,
+                    max_tokens,
+                    min_tokens,
+                    split_strategy,
                     project_id
                 )
             )
@@ -304,11 +315,12 @@ class CrawlerService:
             with open(get_project_output_path(project_id, "convert_process.json"), "w") as f:
                 json.dump({"pid": process.pid, "start_time": time.time()}, f)
             
-            print(f"转换任务已开始，进程ID: {process.pid}")
+            smart_split_info = f"，智能分段: {'开启' if enable_smart_split else '关闭'}"
+            print(f"转换任务已开始，进程ID: {process.pid}{smart_split_info}")
             
             return {
                 "status": "success",
-                "message": f"转换任务已开始，共{len(urls)}个URL，请稍后查看结果"
+                "message": f"转换任务已开始，共{len(urls)}个URL{smart_split_info}，请稍后查看结果"
             }
         except Exception as e:
             logging.error(f"启动转换进程失败: {str(e)}")
@@ -360,6 +372,10 @@ class CrawlerService:
         output_dir,
         included_selector=None,
         excluded_selector=None,
+        enable_smart_split=False,
+        max_tokens=8000,
+        min_tokens=500,
+        split_strategy="balanced",
         project_id=None
     ):
         """在独立进程中运行URL到Markdown的转换任务"""
@@ -376,6 +392,10 @@ class CrawlerService:
                 output_dir=output_dir,
                 included_selector=included_selector,
                 excluded_selector=excluded_selector,
+                enable_smart_split=enable_smart_split,
+                max_tokens=max_tokens,
+                min_tokens=min_tokens,
+                split_strategy=split_strategy,
                 project_id=project_id
             ))
             
@@ -564,6 +584,10 @@ class CrawlerService:
         output_dir: str = None,
         included_selector: Optional[str] = None,
         excluded_selector: Optional[str] = None,
+        enable_smart_split: bool = False,
+        max_tokens: Optional[int] = 8000,
+        min_tokens: Optional[int] = 500,
+        split_strategy: Optional[str] = "balanced",
         project_id: Optional[str] = None
     ) -> List[str]:
         """
@@ -574,6 +598,10 @@ class CrawlerService:
             output_dir: 输出目录
             included_selector: 包含的选择器
             excluded_selector: 排除的选择器
+            enable_smart_split: 是否启用智能分段
+            max_tokens: 最大分段长度
+            min_tokens: 最小分段长度
+            split_strategy: 分段策略
             project_id: 项目ID
         
         Returns:
@@ -645,22 +673,98 @@ class CrawlerService:
                 if result.success and result.markdown and result.markdown.strip():
                     successful_urls += 1
                     
-                    # 生成文件名
-                    filename = CrawlerService.url_to_filename(result.url)
-                    filepath = join_paths(output_dir, filename)
+                    # 根据分段策略调整参数
+                    actual_max_tokens = max_tokens
+                    actual_min_tokens = min_tokens
                     
-                    # 保存markdown内容
-                    with open(filepath, 'w', encoding='utf-8') as f:
-                        f.write(result.markdown)
-                    print(f"已保存内容到: {filepath}")
-
-                    # 更新markdown_manager.json，添加filePath字段
-                    CrawlerService.update_markdown_registry(result.url, filepath, project_id)
+                    if split_strategy == "conservative":
+                        actual_max_tokens = int(max_tokens * 1.2)  # 更大的分段
+                        actual_min_tokens = int(min_tokens * 1.5)
+                    elif split_strategy == "aggressive":
+                        actual_max_tokens = int(max_tokens * 0.8)  # 更小的分段
+                        actual_min_tokens = int(min_tokens * 0.7)
                     
-                    # 更新crawled_urls.json，添加filePath字段
-                    CrawlerService.update_crawled_url_filepath(result.url, filepath, project_id)
+                    if enable_smart_split:
+                        # 启用智能分段
+                        try:
+                            print(f"对 {result.url} 启用智能分段 (策略: {split_strategy}, Token范围: {actual_min_tokens}-{actual_max_tokens})")
+                            
+                            # 创建智能分段器
+                            splitter = MarkdownSplitter(
+                                max_tokens=actual_max_tokens,
+                                min_tokens=actual_min_tokens
+                            )
+                            
+                            # 执行分段
+                            chunks = splitter.create_chunks(result.markdown)
+                            
+                            if chunks and len(chunks) > 1:
+                                # 获取基础文件名（不含扩展名）
+                                base_filename = CrawlerService.url_to_filename(result.url)
+                                base_name = base_filename.replace('.md', '')
+                                
+                                # 保存每个分段到原目录
+                                for chunk in chunks:
+                                    # 简化文件命名：xxx-1.md, xxx-2.md
+                                    chunk_filename = f"{base_name}-{chunk.order}.md"
+                                    chunk_filepath = join_paths(output_dir, chunk_filename)
+                                    
+                                    # 直接保存分段内容，不添加复杂的元数据
+                                    chunk_content = f"# {chunk.title}\n\n{chunk.content}"
+                                    
+                                    with open(chunk_filepath, 'w', encoding='utf-8') as f:
+                                        f.write(chunk_content)
+                                    
+                                    # 为每个分段创建注册表条目（基于文件路径）
+                                    CrawlerService.update_markdown_registry_for_chunk(result.url, chunk_filepath, project_id)
+                                
+                                print(f"已保存智能分段内容: {len(chunks)} 个分段文件到 {output_dir}")
+                                
+                                # 更新爬取URL的文件路径（指向第一个分段）
+                                first_chunk_filepath = join_paths(output_dir, f"{base_name}-1.md")
+                                CrawlerService.update_crawled_url_filepath(result.url, first_chunk_filepath, project_id)
+                                
+                            else:
+                                # 分段结果少于2个，保存原始内容
+                                filename = CrawlerService.url_to_filename(result.url)
+                                filepath = join_paths(output_dir, filename)
+                                
+                                with open(filepath, 'w', encoding='utf-8') as f:
+                                    f.write(result.markdown)
+                                print(f"智能分段未产生多个分段，保存原始内容到: {filepath}")
+                                
+                                CrawlerService.update_markdown_registry(result.url, filepath, project_id)
+                                CrawlerService.update_crawled_url_filepath(result.url, filepath, project_id)
+                                
+                        except Exception as e:
+                            print(f"智能分段失败 {result.url}: {str(e)}，将保存原始内容")
+                            # 分段失败，保存原始内容
+                            filename = CrawlerService.url_to_filename(result.url)
+                            filepath = join_paths(output_dir, filename)
+                            
+                            with open(filepath, 'w', encoding='utf-8') as f:
+                                f.write(result.markdown)
+                            print(f"已保存原始内容到: {filepath}")
+                            
+                            CrawlerService.update_markdown_registry(result.url, filepath, project_id)
+                            CrawlerService.update_crawled_url_filepath(result.url, filepath, project_id)
+                    else:
+                        # 未启用智能分段，保存原始内容
+                        filename = CrawlerService.url_to_filename(result.url)
+                        filepath = join_paths(output_dir, filename)
+                        
+                        with open(filepath, 'w', encoding='utf-8') as f:
+                            f.write(result.markdown)
+                        print(f"已保存内容到: {filepath}")
+                        
+                        CrawlerService.update_markdown_registry(result.url, filepath, project_id)
+                        CrawlerService.update_crawled_url_filepath(result.url, filepath, project_id)
                     
                     # 发送成功通知
+                    success_message = f"已成功转换URL: {result.url}"
+                    if enable_smart_split:
+                        success_message += f" (智能分段: {split_strategy})"
+                    
                     SystemService.send_to_websocket({
                         "task_id": task_id,
                         "type": "html_to_md_convert_progress",
@@ -669,7 +773,7 @@ class CrawlerService:
                         "total": total_urls,
                         "processed": processed_urls,
                         "successful": successful_urls,  
-                        "message": f"已成功转换URL: {result.url}",
+                        "message": success_message,
                         "url": result.url,
                         "success": True
                     }, project_id)
@@ -825,4 +929,74 @@ class CrawlerService:
         except Exception as e:
             print(f"更新Markdown注册表时出错: {str(e)}")
             logging.error(f"更新Markdown注册表时出错: {str(e)}")
+            return False
+
+    @staticmethod
+    def update_markdown_registry_for_chunk(url, filepath, project_id: Optional[str] = None):
+        """
+        为分段文件更新Markdown文件注册表，基于文件路径进行去重而不是URL
+        
+        参数:
+        - url: 爬取的原始URL
+        - filepath: 保存的Markdown文件路径
+        - project_id: 项目ID
+        
+        返回:
+        - bool: 是否成功更新
+        """
+        # 确保目录存在
+        registry_path = get_project_output_path(project_id, "markdown_manager.json")
+        relative_path = filepath.replace('\\', '/')  # 确保路径格式一致  
+        
+        # 创建基本文件记录
+        file_record = {
+            "url": url,
+            "filePath": relative_path,
+            "timestamp": datetime.now().isoformat(),
+            "isDataset": False
+        }
+        
+        registry_data = []
+        
+        try:
+            # 检查文件是否存在
+            if os.path.exists(registry_path):
+                # 读取现有数据
+                with open(registry_path, 'r', encoding='utf-8') as f:
+                    try:
+                        registry_data = json.load(f)
+                        if not isinstance(registry_data, list):
+                            registry_data = []
+                    except json.JSONDecodeError:
+                        # 文件内容不是有效的JSON
+                        registry_data = []
+            else:
+                # 文件不存在，创建新的数组
+                registry_data = []
+            
+            count = len(registry_data)
+            
+            # 检查文件路径是否已存在（而不是URL）
+            filepath_exists = False
+            for item in registry_data:
+                if isinstance(item, dict) and item.get('filePath') == relative_path:
+                    # 更新现有记录
+                    item.update(file_record)
+                    filepath_exists = True
+                    break
+            
+            # 如果文件路径不存在，添加新记录
+            if not filepath_exists:
+                file_record['id'] = count + 1
+                registry_data.append(file_record)
+            
+            # 保存更新后的注册表
+            with open(registry_path, 'w', encoding='utf-8') as f:
+                json.dump(registry_data, f, ensure_ascii=False, indent=2)
+            
+            return True
+        
+        except Exception as e:
+            print(f"更新分段文件注册表时出错: {str(e)}")
+            logging.error(f"更新分段文件注册表时出错: {str(e)}")
             return False

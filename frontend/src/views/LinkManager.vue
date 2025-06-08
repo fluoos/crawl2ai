@@ -152,22 +152,107 @@
       okText="开始转换"
       cancelText="取消"
       :confirmLoading="convertLoading"
+      width="650px"
     >
-      <a-form layout="vertical">
-        <a-form-item label="包含选择器（可选）" name="includedSelector">
-          <a-input 
-            v-model:value="convertOptions.includedSelector" 
-            placeholder="例如: .article-content, #main-content"
-          />
-          <div class="form-item-hint">CSS选择器，用于指定要包含的HTML元素</div>
-        </a-form-item>
-        <a-form-item label="排除选择器（可选）" name="excludedSelector">
-          <a-input 
-            v-model:value="convertOptions.excludedSelector" 
-            placeholder="例如: .ads, .sidebar, .navigation"
-          />
-          <div class="form-item-hint">CSS选择器，用于指定要排除的HTML元素</div>
-        </a-form-item>
+      <a-form layout="vertical" :style="{ marginTop: '-8px' }">
+        <!-- 选择器设置 -->
+        <div class="settings-section">
+          <div class="section-header">
+            <div class="section-indicator selector-indicator"></div>
+            <span class="section-title">内容选择器</span>
+          </div>
+          <a-row :gutter="16">
+            <a-col :span="12">
+              <a-form-item label="包含选择器" name="includedSelector" :style="{ marginBottom: '16px' }">
+                <a-input 
+                  v-model:value="convertOptions.includedSelector" 
+                  placeholder=".article-content"
+                />
+                <div class="form-hint">指定要包含的HTML元素</div>
+              </a-form-item>
+            </a-col>
+            <a-col :span="12">
+              <a-form-item label="排除选择器" name="excludedSelector" :style="{ marginBottom: '16px' }">
+                <a-input 
+                  v-model:value="convertOptions.excludedSelector" 
+                  placeholder=".ads, .sidebar"
+                />
+                <div class="form-hint">指定要排除的HTML元素</div>
+              </a-form-item>
+            </a-col>
+          </a-row>
+        </div>
+        
+        <!-- 智能分段设置 -->
+        <div class="settings-section">
+          <div class="section-header">
+            <div class="section-indicator smart-indicator"></div>
+            <span class="section-title">智能分段</span>
+          </div>
+          
+          <div class="smart-split-toggle">
+            <a-form-item name="enableSmartSplit" :style="{ marginBottom: '12px' }">
+              <a-row justify="space-between" align="middle">
+                <a-col>
+                  <span class="toggle-label">启用智能分段</span>
+                  <div class="form-hint" style="margin-top: 2px;">自动分段，适用于RAG和大模型场景</div>
+                </a-col>
+                <a-col>
+                  <a-switch 
+                    v-model:checked="convertOptions.enableSmartSplit"
+                    checked-children="开启"
+                    un-checked-children="关闭"
+                  />
+                </a-col>
+              </a-row>
+            </a-form-item>
+          </div>
+          
+          <!-- 智能分段配置 -->
+          <template v-if="convertOptions.enableSmartSplit">
+            <div class="smart-config">
+              <a-row :gutter="16" :style="{ marginBottom: '16px' }">
+                <a-col :span="12">
+                  <a-form-item label="最大Token数" name="maxTokens" :style="{ marginBottom: '8px' }">
+                    <a-input-number 
+                      v-model:value="convertOptions.maxTokens"
+                      :min="500"
+                      :max="20000"
+                      :step="100"
+                      style="width: 100%"
+                      placeholder="8000"
+                    />
+                    <div class="form-hint">每段最大Token数</div>
+                  </a-form-item>
+                </a-col>
+                <a-col :span="12">
+                  <a-form-item label="最小Token数" name="minTokens" :style="{ marginBottom: '8px' }">
+                    <a-input-number 
+                      v-model:value="convertOptions.minTokens"
+                      :min="100"
+                      :max="2000"
+                      :step="50"
+                      style="width: 100%"
+                      placeholder="300"
+                    />
+                    <div class="form-hint">每段最小Token数</div>
+                  </a-form-item>
+                </a-col>
+              </a-row>
+              
+              <a-form-item label="分段策略" name="splitStrategy" :style="{ marginBottom: '8px' }">
+                <a-select 
+                  v-model:value="convertOptions.splitStrategy"
+                  placeholder="选择分段策略"
+                >
+                  <a-select-option value="conservative">保守策略 - 较少分段，保持完整性</a-select-option>
+                  <a-select-option value="balanced">平衡策略 - 兼顾完整性和检索效果</a-select-option>
+                  <a-select-option value="aggressive">积极策略 - 更多分段，适合精细检索</a-select-option>
+                </a-select>
+              </a-form-item>
+            </div>
+          </template>
+        </div>
       </a-form>
     </a-modal>
   </div>
@@ -194,7 +279,11 @@ const formState = reactive({
 // 转换选项状态
 const convertOptions = reactive({
   includedSelector: '',
-  excludedSelector: ''
+  excludedSelector: '',
+  enableSmartSplit: true,
+  maxTokens: 8000,
+  minTokens: 500,
+  splitStrategy: 'conservative'
 });
 
 // 转换弹窗状态
@@ -456,11 +545,21 @@ const showConvertModal = () => {
 const handleConvertConfirm = async () => {
   convertLoading.value = true;
   try {
-    const response = await convertToMarkdown({
+    const requestData = {
       urls: urlsToConvert.value,
       included_selector: convertOptions.includedSelector || null,
       excluded_selector: convertOptions.excludedSelector || null
-    });
+    };
+
+    // 如果启用智能分段，添加相关参数
+    if (convertOptions.enableSmartSplit) {
+      requestData.enable_smart_split = true;
+      requestData.max_tokens = convertOptions.maxTokens;
+      requestData.min_tokens = convertOptions.minTokens;
+      requestData.split_strategy = convertOptions.splitStrategy;
+    }
+
+    const response = await convertToMarkdown(requestData);
     
     if (response.status === 'success') {
       message.success('转换任务已提交，稍后更新进度结果');
@@ -493,5 +592,54 @@ const handleConvertConfirm = async () => {
   font-size: 12px;
   color: #999;
   margin-top: 4px;
+}
+
+.form-hint {
+  font-size: 11px;
+  color: #8c8c8c;
+  margin-top: 2px;
+  line-height: 1.4;
+}
+
+.settings-section {
+  margin-bottom: 24px;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.section-indicator {
+  width: 2px;
+  height: 13px;
+  border-radius: 0;
+  margin-right:8px;
+}
+
+.selector-indicator {
+  background-color: #1890ff;
+}
+
+.smart-indicator {
+  background-color: #52c41a;
+}
+
+.section-title {
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.smart-split-toggle {
+  margin-bottom: 16px;
+}
+
+.toggle-label {
+  font-weight: 500;
+}
+
+.smart-config {
+  margin-bottom: 16px;
 }
 </style> 

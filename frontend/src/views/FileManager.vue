@@ -95,7 +95,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onUnmounted } from 'vue';
+import { ref, reactive, onMounted, onUnmounted, nextTick } from 'vue';
 import { message, Modal } from 'ant-design-vue';
 import { ReloadOutlined } from '@ant-design/icons-vue';
 import DataTable from '../components/common/DataTable.vue';
@@ -190,7 +190,10 @@ const fetchFileList = async () => {
         ...file,
         id: file.id || file.url || file.filename
       }));
-      fileList.value = files;
+      fileList.value = []
+      nextTick(() => {
+        fileList.value = files;
+      })
       pagination.total = response.total || files.length;
     } else {
       fileList.value = [];

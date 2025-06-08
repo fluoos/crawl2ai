@@ -60,7 +60,8 @@ class FilesService:
                 print(f"读取markdown_manager.json出错: {str(e)}")
                 # 出错时使用空列表继续
                 
-        # 按修改时间降序排序
+        # 先按文件名升序排序，再按修改时间降序排序（稳定排序）
+        all_files.sort(key=lambda x: x["filename"])
         all_files.sort(key=lambda x: x["modifiedTime"], reverse=True)
         
         # 计算分页

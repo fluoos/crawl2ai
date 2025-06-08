@@ -80,6 +80,10 @@ async def convert_to_markdown(
             urls=urls, 
             included_selector=request.included_selector,
             excluded_selector=request.excluded_selector,
+            enable_smart_split=request.enable_smart_split,
+            max_tokens=request.max_tokens,
+            min_tokens=request.min_tokens,
+            split_strategy=request.split_strategy,
             project_id=project_id
         )
     except Exception as e:
