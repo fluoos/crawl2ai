@@ -15,6 +15,7 @@
 - 支持深度爬取指定域名的所有链接
 - 支持将链接转换成大模型友好的Markdown文件
 - 支持上传.md、.txt、.pdf、.docx、.doc等文件，自动转换成.md文件
+- 支持智能算法对Markdown文件分段
 - 支持通过DeepSeek、ChatGPT、Gemma等大模型将Markdown转换成训练大模型可用的数据集
 - 支持数据集数据的自定义增加、编辑、修改
 - 支持导出 JSONL 和 JSON 两种输出格式，Alpaca、ShareGPT 和自定义格式

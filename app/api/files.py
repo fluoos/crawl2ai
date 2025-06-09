@@ -36,11 +36,24 @@ async def preview_file(
 @router.post("/upload")
 async def upload_files(
     files: List[UploadFile] = File(...),
-    project_id: Optional[str] = Form(None, alias="projectId")
+    project_id: Optional[str] = Form(None, alias="projectId"),
+    enableSmartSplit: Optional[bool] = Form(False),
+    maxTokens: Optional[int] = Form(8000),
+    minTokens: Optional[int] = Form(500),
+    splitStrategy: Optional[str] = Form("balanced")
 ):
-    """上传文件，非Markdown文件会被自动转换"""
+    """上传文件，非Markdown文件会被自动转换，支持智能分段"""
     try:
-        return FilesService.upload_files(files, project_id)
+        smart_split_config = None
+        if enableSmartSplit:
+            smart_split_config = {
+                "enableSmartSplit": enableSmartSplit,
+                "maxTokens": maxTokens,
+                "minTokens": minTokens,
+                "splitStrategy": splitStrategy
+            }
+        
+        return FilesService.upload_files(files, project_id, smart_split_config)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
