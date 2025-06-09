@@ -3,7 +3,28 @@
     <a-page-header title="文件管理" subtitle="管理和处理文件" />
     
     <a-card title="上传文件" class="card-wrapper">
-      <FileUploader @upload-success="handleUploadSuccess" />
+      <template #extra>
+        <a-space>
+          <span class="smart-split-label">智能分段:</span>
+          <a-switch 
+            v-model:checked="smartSplitEnabled"
+            checked-children="开启"
+            un-checked-children="关闭"
+          />
+          <a-button 
+            type="text" 
+            size="small"
+            @click="showSmartSplitConfig"
+            :disabled="!smartSplitEnabled"
+          >
+            <SettingOutlined />
+          </a-button>
+        </a-space>
+      </template>
+      <FileUploader 
+        @upload-success="handleUploadSuccess" 
+        :smart-split-config="smartSplitEnabled ? smartSplitConfig : null"
+      />
     </a-card>
     
     <a-card title="Markdown文件列表" class="card-wrapper">
@@ -32,7 +53,9 @@
         @change="handleTableChange"
       >
         <template #body-filename="{ record }">
-          <a @click="previewFile(record)">{{ record.filename }}</a>
+          <a-tooltip :title="record.filename">
+            <a @click="previewFile(record)">{{ record.filename }}</a>
+          </a-tooltip>
         </template>
         <template #body-size="{ record }">
           {{ formatFileSize(record.size) }}
@@ -91,13 +114,96 @@
         <a-empty v-else description="文件内容为空" />
       </div>
     </a-modal>
+    
+    <!-- 智能分段配置弹窗 -->
+    <a-modal
+      v-model:visible="smartSplitConfigVisible"
+      title="智能分段配置"
+      @ok="saveSmartSplitConfig"
+      okText="保存配置"
+      cancelText="取消"
+      width="600px"
+    >
+      <a-form layout="vertical" :style="{ marginTop: '-8px' }">
+        <!-- 智能分段设置 -->
+        <div class="settings-section">
+          <div class="section-header">
+            <div class="section-indicator smart-indicator"></div>
+            <span class="section-title">智能分段配置</span>
+          </div>
+          
+          <div class="smart-split-toggle">
+            <a-form-item name="enableSmartSplit" :style="{ marginBottom: '12px' }">
+              <a-row justify="space-between" align="middle">
+                <a-col>
+                  <span class="toggle-label">启用智能分段</span>
+                  <div class="form-hint" style="margin-top: 2px;">自动分段，适用于调用大模型Token有限制的场景</div>
+                </a-col>
+                <a-col>
+                  <a-switch 
+                    v-model:checked="smartSplitConfig.enableSmartSplit"
+                    checked-children="开启"
+                    un-checked-children="关闭"
+                  />
+                </a-col>
+              </a-row>
+            </a-form-item>
+          </div>
+          
+          <!-- 智能分段配置 -->
+          <template v-if="smartSplitConfig.enableSmartSplit">
+            <div class="smart-config">
+              <a-row :gutter="16" :style="{ marginBottom: '16px' }">
+                <a-col :span="12">
+                  <a-form-item label="最大Token数" name="maxTokens" :style="{ marginBottom: '8px' }">
+                    <a-input-number 
+                      v-model:value="smartSplitConfig.maxTokens"
+                      :min="500"
+                      :max="20000"
+                      :step="100"
+                      style="width: 100%"
+                      placeholder="8000"
+                    />
+                    <div class="form-hint">每段最大Token数</div>
+                  </a-form-item>
+                </a-col>
+                <a-col :span="12">
+                  <a-form-item label="最小Token数" name="minTokens" :style="{ marginBottom: '8px' }">
+                    <a-input-number 
+                      v-model:value="smartSplitConfig.minTokens"
+                      :min="100"
+                      :max="2000"
+                      :step="50"
+                      style="width: 100%"
+                      placeholder="300"
+                    />
+                    <div class="form-hint">每段最小Token数</div>
+                  </a-form-item>
+                </a-col>
+              </a-row>
+              
+              <a-form-item label="分段策略" name="splitStrategy" :style="{ marginBottom: '8px' }">
+                <a-select 
+                  v-model:value="smartSplitConfig.splitStrategy"
+                  placeholder="选择分段策略"
+                >
+                  <a-select-option value="conservative">保守策略 - 较少分段，保持完整性</a-select-option>
+                  <a-select-option value="balanced">平衡策略 - 兼顾完整性和检索效果</a-select-option>
+                  <a-select-option value="aggressive">积极策略 - 更多分段，适合精细检索</a-select-option>
+                </a-select>
+              </a-form-item>
+            </div>
+          </template>
+        </div>
+      </a-form>
+    </a-modal>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onUnmounted } from 'vue';
+import { ref, reactive, onMounted, onUnmounted, nextTick } from 'vue';
 import { message, Modal } from 'ant-design-vue';
-import { ReloadOutlined } from '@ant-design/icons-vue';
+import { ReloadOutlined, SettingOutlined } from '@ant-design/icons-vue';
 import DataTable from '../components/common/DataTable.vue';
 import FileUploader from '../components/common/FileUploader.vue';
 import { getFileList, convertToDataset, getFilePreview, deleteFiles } from '../services/files';
@@ -128,6 +234,16 @@ const convertModalVisible = ref(false);
 const convertForm = reactive({
   outputFile: 'qa_dataset.jsonl',
   files: []
+});
+
+// 智能分段相关
+const smartSplitEnabled = ref(true);
+const smartSplitConfigVisible = ref(false);
+const smartSplitConfig = reactive({
+  enableSmartSplit: true,
+  maxTokens: 8000,
+  minTokens: 500,
+  splitStrategy: 'balanced'
 });
 
 // 表格列定义
@@ -190,7 +306,10 @@ const fetchFileList = async () => {
         ...file,
         id: file.id || file.url || file.filename
       }));
-      fileList.value = files;
+      fileList.value = []
+      nextTick(() => {
+        fileList.value = files;
+      })
       pagination.total = response.total || files.length;
     } else {
       fileList.value = [];
@@ -264,9 +383,23 @@ const confirmConvert = async () => {
   
   convertLoading.value = true;
   try {
+    const requestData = {
+      files: convertForm.files,
+      outputFile: convertForm.outputFile
+    };
+
+    // 如果启用智能分段，添加相关参数
+    if (smartSplitEnabled.value && smartSplitConfig.enableSmartSplit) {
+      requestData.enableSmartSplit = true;
+      requestData.maxTokens = smartSplitConfig.maxTokens;
+      requestData.minTokens = smartSplitConfig.minTokens;
+      requestData.splitStrategy = smartSplitConfig.splitStrategy;
+    }
+
     const response = await convertToDataset(
-      convertForm.files,
-      convertForm.outputFile
+      requestData.files,
+      requestData.outputFile,
+      requestData
     );
     
     if (response && response.status === 'success') {
@@ -313,6 +446,20 @@ const handleDelete = async (record) => {
   });
 }
 
+// 显示智能分段配置弹窗
+const showSmartSplitConfig = () => {
+  smartSplitConfigVisible.value = true;
+};
+
+// 保存智能分段配置
+const saveSmartSplitConfig = () => {
+  message.success('智能分段配置已保存, 临时有效，刷新页面后失效');
+  smartSplitConfigVisible.value = false;
+  
+  // 同步主开关状态
+  smartSplitEnabled.value = smartSplitConfig.enableSmartSplit;
+};
+
 // 格式化文件大小
 const formatFileSize = (bytes) => {
   if (!bytes) return '0 B';
@@ -352,5 +499,55 @@ const formatFileSize = (bytes) => {
   padding: 12px;
   border-radius: 4px;
   font-family: monospace;
+}
+
+.smart-split-label {
+  font-size: 13px;
+  color: #666;
+}
+
+.form-hint {
+  font-size: 11px;
+  color: #8c8c8c;
+  margin-top: 2px;
+  line-height: 1.4;
+}
+
+.settings-section {
+  margin-bottom: 24px;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.section-indicator {
+  width: 2px;
+  height: 13px;
+  border-radius: 0;
+  margin-right: 8px;
+}
+
+.smart-indicator {
+  background-color: #52c41a;
+}
+
+.section-title {
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.smart-split-toggle {
+  margin-bottom: 16px;
+}
+
+.toggle-label {
+  font-weight: 500;
+}
+
+.smart-config {
+  margin-bottom: 16px;
 }
 </style> 

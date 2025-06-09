@@ -6,6 +6,7 @@ from typing import List, Dict, Any, Optional
 
 from app.utils.path_utils import get_project_output_path, ensure_dir, join_paths
 from app.core.config import settings
+from app.core.markdown_splitter import MarkdownSplitter
 
 class FilesService:
     """文件服务类，处理所有与文件相关的业务逻辑"""
@@ -60,7 +61,8 @@ class FilesService:
                 print(f"读取markdown_manager.json出错: {str(e)}")
                 # 出错时使用空列表继续
                 
-        # 按修改时间降序排序
+        # 先按文件名升序排序，再按修改时间降序排序（稳定排序）
+        all_files.sort(key=lambda x: x["filename"])
         all_files.sort(key=lambda x: x["modifiedTime"], reverse=True)
         
         # 计算分页
@@ -123,7 +125,7 @@ class FilesService:
             raise ValueError("文件编码错误，无法预览")
     
     @staticmethod
-    def upload_files(files: List[Any], project_id: Optional[str] = None) -> Dict[str, Any]:
+    def upload_files(files: List[Any], project_id: Optional[str] = None, smart_split_config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """上传文件，非Markdown文件会被自动转换"""
         # 确保目录存在
         upload_dir = get_project_output_path(project_id, "upload")
@@ -149,27 +151,63 @@ class FilesService:
                 markdown_path = os.path.join(markdown_dir, file.filename)
                 shutil.copy2(original_path, markdown_path)
                 
-                # 更新markdown_manager.json
-                base_name = os.path.splitext(file.filename)[0]
-                FilesService.update_markdown_registry(original_path, markdown_path, base_name, is_converted=False, project_id=project_id)
-                
-                uploaded_files.append({
-                    "filename": file.filename,
-                    "path": markdown_path,
-                    "size": os.stat(markdown_path).st_size,
-                    "converted": False
-                })
+                # 如果启用智能分段，处理Markdown文件
+                if smart_split_config and smart_split_config.get("enableSmartSplit", False):
+                    try:
+                        split_result = FilesService.apply_smart_split_to_markdown(
+                            markdown_path, 
+                            smart_split_config,
+                            project_id
+                        )
+                        if split_result["success"]:
+                            uploaded_files.extend(split_result["files"])
+                        else:
+                            # 智能分段失败，使用原文件
+                            base_name = os.path.splitext(file.filename)[0]
+                            FilesService.update_markdown_registry(original_path, markdown_path, base_name, is_converted=False, project_id=project_id)
+                            uploaded_files.append({
+                                "filename": file.filename,
+                                "path": markdown_path,
+                                "size": os.stat(markdown_path).st_size,
+                                "converted": False,
+                                "error": split_result.get("error")
+                            })
+                    except Exception as e:
+                        # 智能分段出错，使用原文件
+                        base_name = os.path.splitext(file.filename)[0]
+                        FilesService.update_markdown_registry(original_path, markdown_path, base_name, is_converted=False, project_id=project_id)
+                        uploaded_files.append({
+                            "filename": file.filename,
+                            "path": markdown_path,
+                            "size": os.stat(markdown_path).st_size,
+                            "converted": False,
+                            "error": f"智能分段失败: {str(e)}"
+                        })
+                else:
+                    # 不启用智能分段，直接注册文件
+                    base_name = os.path.splitext(file.filename)[0]
+                    FilesService.update_markdown_registry(original_path, markdown_path, base_name, is_converted=False, project_id=project_id)
+                    uploaded_files.append({
+                        "filename": file.filename,
+                        "path": markdown_path,
+                        "size": os.stat(markdown_path).st_size,
+                        "converted": False
+                    })
             else:
                 # 非Markdown文件，需要转换
                 conversion_result = FilesService.convert_to_markdown(
                     original_path=original_path,
                     markdown_dir=markdown_dir,
                     filename=file.filename,
-                    project_id=project_id
+                    project_id=project_id,
+                    smart_split_config=smart_split_config
                 )
                 
                 if conversion_result["success"]:
-                    converted_files.append(conversion_result["file_info"])
+                    if smart_split_config and smart_split_config.get("enableSmartSplit", False):
+                        converted_files.extend(conversion_result["files"])
+                    else:
+                        converted_files.append(conversion_result["file_info"])
                 else:
                     uploaded_files.append({
                         "filename": file.filename,
@@ -187,7 +225,7 @@ class FilesService:
         }
     
     @staticmethod
-    def convert_to_markdown(original_path: str, markdown_dir: str, filename: str, project_id: Optional[str] = None) -> Dict[str, Any]:
+    def convert_to_markdown(original_path: str, markdown_dir: str, filename: str, project_id: Optional[str] = None, smart_split_config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         将非Markdown文件转换为Markdown格式
         
@@ -219,22 +257,67 @@ class FilesService:
             with open(markdown_path, "w", encoding="utf-8") as f:
                 f.write(result.text_content)
             
-            # 构建文件信息
-            file_info = {
-                "original_filename": filename,
-                "markdown_filename": markdown_filename,
-                "path": markdown_path,
-                "size": os.stat(markdown_path).st_size
-            }
-            
-            # 更新markdown_manager.json
-            FilesService.update_markdown_registry(original_path, markdown_path, base_name, is_converted=True, project_id=project_id)
-            
-            return {
-                "success": True,
-                "file_info": file_info,
-                "error": None
-            }
+            # 如果启用智能分段，处理转换后的Markdown文件
+            if smart_split_config and smart_split_config.get("enableSmartSplit", False):
+                try:
+                    split_result = FilesService.apply_smart_split_to_markdown(
+                        markdown_path, 
+                        smart_split_config,
+                        project_id
+                    )
+                    if split_result["success"]:
+                        return {
+                            "success": True,
+                            "files": split_result["files"],
+                            "error": None
+                        }
+                    else:
+                        # 智能分段失败，使用原转换文件
+                        FilesService.update_markdown_registry(original_path, markdown_path, base_name, is_converted=True, project_id=project_id)
+                        file_info = {
+                            "original_filename": filename,
+                            "markdown_filename": markdown_filename,
+                            "path": markdown_path,
+                            "size": os.stat(markdown_path).st_size,
+                            "error": f"智能分段失败: {split_result.get('error')}"
+                        }
+                        return {
+                            "success": True,
+                            "file_info": file_info,
+                            "error": None
+                        }
+                except Exception as e:
+                    # 智能分段出错，使用原转换文件
+                    FilesService.update_markdown_registry(original_path, markdown_path, base_name, is_converted=True, project_id=project_id)
+                    file_info = {
+                        "original_filename": filename,
+                        "markdown_filename": markdown_filename,
+                        "path": markdown_path,
+                        "size": os.stat(markdown_path).st_size,
+                        "error": f"智能分段失败: {str(e)}"
+                    }
+                    return {
+                        "success": True,
+                        "file_info": file_info,
+                        "error": None
+                    }
+            else:
+                # 不启用智能分段，直接返回转换结果
+                file_info = {
+                    "original_filename": filename,
+                    "markdown_filename": markdown_filename,
+                    "path": markdown_path,
+                    "size": os.stat(markdown_path).st_size
+                }
+                
+                # 更新markdown_manager.json
+                FilesService.update_markdown_registry(original_path, markdown_path, base_name, is_converted=True, project_id=project_id)
+                
+                return {
+                    "success": True,
+                    "file_info": file_info,
+                    "error": None
+                }
             
         except Exception as e:
             print(f"转换文件 {filename} 失败: {str(e)}")
@@ -445,4 +528,148 @@ class FilesService:
                 "status": "error",
                 "message": f"所有 {len(failed_files)} 个文件删除失败",
                 "failed": failed_files
+            }
+    
+    @staticmethod
+    def smart_split_content(content: str, max_tokens: int = 8000, min_tokens: int = 500, strategy: str = "balanced"):
+        """
+        智能分段功能，使用MarkdownSplitter根据配置将长文本分割成适合的段落
+        
+        参数:
+        - content: 要分割的文本内容
+        - max_tokens: 每段最大Token数
+        - min_tokens: 每段最小Token数  
+        - strategy: 分段策略 ('conservative', 'balanced', 'aggressive')
+        
+        返回:
+        - List[Dict]: 分割后的文本段落对象列表，包含title、content、order等信息
+        """
+        try:
+            # 根据分段策略调整参数
+            actual_max_tokens = max_tokens
+            actual_min_tokens = min_tokens
+            
+            if strategy == "conservative":
+                actual_max_tokens = int(max_tokens * 1.2)  # 更大的分段
+                actual_min_tokens = int(min_tokens * 1.5)
+            elif strategy == "aggressive":
+                actual_max_tokens = int(max_tokens * 0.8)  # 更小的分段
+                actual_min_tokens = int(min_tokens * 0.7)
+            
+            # 创建智能分段器
+            splitter = MarkdownSplitter(
+                max_tokens=actual_max_tokens,
+                min_tokens=actual_min_tokens
+            )
+            
+            # 执行分段
+            chunks = splitter.create_chunks(content)
+            
+            return chunks if chunks else []
+            
+        except Exception as e:
+            print(f"智能分段失败: {str(e)}")
+            # 分段失败时返回原始内容
+            return [type('Chunk', (), {
+                'order': 1,
+                'title': '原始内容',
+                'content': content
+            })()]
+    
+    @staticmethod
+    def apply_smart_split_to_markdown(markdown_path: str, smart_split_config: Dict[str, Any], project_id: Optional[str] = None) -> Dict[str, Any]:
+        """
+        对Markdown文件应用智能分段，使用MarkdownSplitter
+        
+        参数:
+        - markdown_path: Markdown文件路径
+        - smart_split_config: 智能分段配置
+        - project_id: 项目ID
+        
+        返回:
+        - Dict: 包含分段结果的字典
+        """
+        try:
+            # 读取原始文件内容
+            with open(markdown_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            
+            # 获取配置参数
+            max_tokens = smart_split_config.get("maxTokens", 8000)
+            min_tokens = smart_split_config.get("minTokens", 500)
+            strategy = smart_split_config.get("splitStrategy", "balanced")
+            
+            print(f"对文件 {markdown_path} 启用智能分段 (策略: {strategy}, Token范围: {min_tokens}-{max_tokens})")
+            
+            # 应用智能分段
+            chunks = FilesService.smart_split_content(content, max_tokens, min_tokens, strategy)
+            
+            if not chunks or len(chunks) <= 1:
+                # 如果分段后只有一个块或没有分段，保持原文件
+                original_filename = os.path.basename(markdown_path)
+                base_name = os.path.splitext(original_filename)[0]
+                FilesService.update_markdown_registry(markdown_path, markdown_path, base_name, is_converted=False, project_id=project_id)
+                
+                print(f"智能分段未产生多个分段，保持原文件: {markdown_path}")
+                
+                return {
+                    "success": True,
+                    "files": [{
+                        "filename": original_filename,
+                        "path": markdown_path,
+                        "size": os.stat(markdown_path).st_size,
+                        "converted": False,
+                        "split_index": 0,
+                        "total_splits": 1
+                    }]
+                }
+            
+            # 创建分段文件
+            files = []
+            base_name = os.path.splitext(os.path.basename(markdown_path))[0]
+            markdown_dir = os.path.dirname(markdown_path)
+            
+            for chunk in chunks:
+                # 创建分段文件名，与crawler_service保持一致：xxx-1.md, xxx-2.md
+                split_filename = f"{base_name}-{chunk.order}.md"
+                split_path = os.path.join(markdown_dir, split_filename)
+                
+                # 写入分段内容，格式与crawler_service保持一致
+                chunk_content = f"# {chunk.title}\n\n{chunk.content}"
+                with open(split_path, "w", encoding="utf-8") as f:
+                    f.write(chunk_content)
+                
+                # 更新registry
+                FilesService.update_markdown_registry(
+                    markdown_path, 
+                    split_path, 
+                    f"{base_name} - 第{chunk.order}部分", 
+                    is_converted=False, 
+                    project_id=project_id
+                )
+                
+                files.append({
+                    "filename": split_filename,
+                    "path": split_path,
+                    "size": os.stat(split_path).st_size,
+                    "converted": False,
+                    "split_index": chunk.order,
+                    "total_splits": len(chunks)
+                })
+            
+            print(f"已保存智能分段内容: {len(chunks)} 个分段文件到 {markdown_dir}")
+            
+            # 删除原始文件
+            os.remove(markdown_path)
+            
+            return {
+                "success": True,
+                "files": files
+            }
+            
+        except Exception as e:
+            print(f"智能分段失败 {markdown_path}: {str(e)}")
+            return {
+                "success": False,
+                "error": str(e)
             }

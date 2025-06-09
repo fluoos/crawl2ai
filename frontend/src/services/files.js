@@ -62,9 +62,18 @@ export const deleteFiles = (params) => {
 /**
  * 上传文件
  * @param {FormData} formData 表单数据
+ * @param {Object} smartSplitConfig 智能分段配置
  * @returns {Promise}
  */
-export const uploadFile = (formData) => {
+export const uploadFile = (formData, smartSplitConfig = null) => {
+  // 如果有智能分段配置，添加到formData中
+  if (smartSplitConfig) {
+    formData.append('enableSmartSplit', smartSplitConfig.enableSmartSplit);
+    formData.append('maxTokens', smartSplitConfig.maxTokens);
+    formData.append('minTokens', smartSplitConfig.minTokens);
+    formData.append('splitStrategy', smartSplitConfig.splitStrategy);
+  }
+  
   return request({
     url: '/api/files/upload',
     method: 'post',

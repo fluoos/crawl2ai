@@ -15,6 +15,7 @@ A tool for large model dataset generation and fine-tuning, enabling one-click cr
 - Support for deep crawling of all links from specified domains
 - Support for converting links into large model-friendly Markdown files
 - Support for uploading .md, .txt, .pdf, .docx, .doc and other files, with automatic conversion to .md files
+- Supports intelligent segmentation of Markdown files
 - Support for converting Markdown files into datasets suitable for training large models using DeepSeek, ChatGPT, Gemma, and other large models
 - Support for custom adding, editing, and modifying of dataset data
 - Support for exporting in JSONL and JSON formats, with Alpaca, ShareGPT, and custom formats

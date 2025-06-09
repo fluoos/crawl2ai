@@ -45,6 +45,10 @@ const props = defineProps({
   accept: {
     type: String,
     default: '.md,.txt,.pdf,.docx,.doc'
+  },
+  smartSplitConfig: {
+    type: Object,
+    default: null
   }
 });
 
@@ -97,7 +101,7 @@ const handleUpload = async () => {
   });
   
   try {
-    const result = await uploadFile(formData);
+    const result = await uploadFile(formData, props.smartSplitConfig);
     message.success('上传成功');
     fileList.value = [];
     emit('upload-success', result);

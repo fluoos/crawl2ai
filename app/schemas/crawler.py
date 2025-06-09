@@ -32,6 +32,12 @@ class UrlToMarkdownRequest(BaseModel):
     excluded_selector: Optional[str] = None
     projectId: Optional[str] = None
     
+    # 智能分段参数
+    enable_smart_split: bool = False
+    max_tokens: Optional[int] = 8000
+    min_tokens: Optional[int] = 500
+    split_strategy: Optional[str] = "balanced"  # conservative, aggressive, balanced
+
 class UrlToMarkdownResponse(BaseModel):
     status: str
     message: str
