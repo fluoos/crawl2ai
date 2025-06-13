@@ -263,6 +263,7 @@ import { ref, reactive, onMounted, onUnmounted } from 'vue';
 import { message, Modal } from 'ant-design-vue';
 import { ReloadOutlined  } from '@ant-design/icons-vue';
 import { crawlLinks, getCrawlStatus, convertToMarkdown, stopCrawl, deleteUrls } from '../services/crawler';
+import { getFileStrategy } from '../services/system';
 import wsService from '../services/websocket';
 
 // 表单状态
@@ -282,8 +283,8 @@ const convertOptions = reactive({
   excludedSelector: '',
   enableSmartSplit: true,
   maxTokens: 8000,
-  minTokens: 500,
-  splitStrategy: 'conservative'
+  minTokens: 300,
+  splitStrategy: 'balanced'
 });
 
 // 转换弹窗状态
@@ -345,6 +346,7 @@ const columns = [
 // 初始化
 onMounted(() => {
   fetchCrawlStatus();
+  fetchSmartSplitConfig();
   
   // 订阅WebSocket消息，监听URL转换为Markdown的进度
   wsService.on('ws:html_to_md_convert_progress', handleConvertProgress);
@@ -363,6 +365,23 @@ const handleConvertProgress = (data) => {
   // 如果状态是completed或processing，自动刷新列表数据
   if (data.status === 'completed' || (data.status === 'processing' && data.processed % 5 === 0)) {
     fetchCrawlStatus();
+  }
+};
+
+// 获取智能分段配置
+const fetchSmartSplitConfig = async () => {
+  try {
+    const response = await getFileStrategy();
+    if (response && response.data) {
+      const data = response.data;
+      // 更新智能分段配置
+      convertOptions.enableSmartSplit = data.enableSmartSplit !== false;
+      convertOptions.maxTokens = data.maxTokens || 8000;
+      convertOptions.minTokens = data.minTokens || 300;
+      convertOptions.splitStrategy = data.splitStrategy || 'balanced';
+    }
+  } catch (error) {
+    console.error('获取智能分段配置失败:', error);
   }
 };
 

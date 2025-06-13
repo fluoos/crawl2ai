@@ -1,6 +1,6 @@
 <div align="center">
 
-**A Powerful Large Model Dataset Generation Tool**
+**A Powerful Large Model Fine-tuning Dataset Generation and Management Tool**
 
 [简体中文](./README.md) | [English](./README.en.md)
 
@@ -8,20 +8,20 @@
 
 # Dataset Generation and Large Model Fine-tuning Tool
 
-A tool for large model dataset generation and fine-tuning, enabling one-click crawling of links from specified domains, converting links into large model-friendly Markdown files, and transforming Markdown files into datasets suitable for training large models using ChatGPT, Deepseek, Gemma, and other LLMs.
+A large model fine-tuning dataset generation and management tool that enables one-click crawling of links from specified domains, supports converting links into large model-friendly Markdown files, and supports converting Markdown files into datasets suitable for training large models through ChatGPT, Deepseek, Gemma, and other large models.
 
 ## Features
 
 - Support for deep crawling of all links from specified domains
 - Support for converting links into large model-friendly Markdown files
 - Support for uploading .md, .txt, .pdf, .docx, .doc and other files, with automatic conversion to .md files
-- Supports intelligent segmentation of Markdown files
-- Support for converting Markdown files into datasets suitable for training large models using DeepSeek, ChatGPT, Gemma, and other large models
-- Support for custom adding, editing, and modifying of dataset data
+- Support for intelligent algorithm-based segmentation of Markdown files
+- Support for converting Markdown files into datasets suitable for training large models through DeepSeek, ChatGPT, Gemma, and other large models
+- Support for custom addition, editing, and modification of dataset data
 - Support for exporting in JSONL and JSON formats, with Alpaca, ShareGPT, and custom formats
 - Support for previewing conversion results
 
-## Screenshots
+## Feature Screenshots
 
 <table>
   <tr>
@@ -166,24 +166,6 @@ npm run dev
 └── requirements.txt        # Python dependencies file
 ```
 
-## Data Format
-
-The input file `qa_dataset.jsonl` should be in JSONL format, with each line containing a JSON object that must include the following fields:
-
-```json
-{
-  "question": "Question content",
-  "answer": "Answer content",
-  "label": "Label (optional)"
-}
-```
-
-## Supported Output Formats
-
-1. **Alpaca format**: Suitable for instruction fine-tuning
-2. **ShareGPT format**: Suitable for dialogue fine-tuning
-3. **Custom format**: Customizable field mapping
-
 ## Troubleshooting
 
 1. If you encounter the following errors during execution:
@@ -195,3 +177,10 @@ The input file `qa_dataset.jsonl` should be in JSONL format, with each line cont
    pip install 'markitdown[all]'
    pip install onnxruntime
    ```
+
+### Contributing
+
+If you have good suggestions or ideas, feel free to submit issues or pull requests.
+
+### License
+The MIT License(http://opensource.org/licenses/MIT)
