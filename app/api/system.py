@@ -31,10 +31,10 @@ class PromptsConfig(BaseModel):
     data: str = ""
 
 class FileStrategyConfig(BaseModel):
-    chunkSize: int = settings.DEFAULT_CHUNK_SIZE
-    overlapSize: int = settings.DEFAULT_OVERLAP_SIZE
-    preserveMarkdown: bool = settings.DEFAULT_PRESERVE_MARKDOWN
-    smartChunking: bool = settings.DEFAULT_SMART_CHUNKING
+    enableSmartSplit: bool = True
+    maxTokens: int = 8000
+    minTokens: int = 300
+    splitStrategy: str = "balanced"
 
 @router.get("/config/models")
 async def get_models():
@@ -118,10 +118,10 @@ async def update_file_strategy(strategy: FileStrategyConfig):
     """更新文件策略配置"""
     try:
         return SystemService.update_file_strategy({
-            "chunkSize": strategy.chunkSize,
-            "overlapSize": strategy.overlapSize,
-            "preserveMarkdown": strategy.preserveMarkdown,
-            "smartChunking": strategy.smartChunking
+            "enableSmartSplit": strategy.enableSmartSplit,
+            "maxTokens": strategy.maxTokens,
+            "minTokens": strategy.minTokens,
+            "splitStrategy": strategy.splitStrategy
         })
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

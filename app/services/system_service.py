@@ -421,10 +421,10 @@ class SystemService:
         """获取文件策略配置"""
         default_strategy = {
             "data": {
-                "chunkSize": settings.DEFAULT_CHUNK_SIZE,
-                "overlapSize": settings.DEFAULT_OVERLAP_SIZE,
-                "preserveMarkdown": settings.DEFAULT_PRESERVE_MARKDOWN,
-                "smartChunking": settings.DEFAULT_SMART_CHUNKING
+                "enableSmartSplit": True,
+                "maxTokens": 8000,
+                "minTokens": 300,
+                "splitStrategy": "balanced"
             }
         }
         strategy = SystemService._read_json_file(SystemService.FILE_STRATEGY_CONFIG_FILE, {})
@@ -450,7 +450,12 @@ class SystemService:
     def reset_file_strategy() -> Dict[str, Any]:
         """重置文件策略配置"""
         default_strategy = {
-            "data": ''
+            "data": {
+                "enableSmartSplit": True,
+                "maxTokens": 8000,
+                "minTokens": 300,
+                "splitStrategy": "balanced"
+            }
         }
         SystemService._write_json_file(SystemService.FILE_STRATEGY_CONFIG_FILE, default_strategy)
         return {"status": "success", "message": "文件策略配置已重置"}

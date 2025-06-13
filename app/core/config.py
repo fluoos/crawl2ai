@@ -27,11 +27,11 @@ class Settings(BaseSettings):
     PROMPTS_CONFIG_FILE: str = "prompts.json"
     FILE_STRATEGY_CONFIG_FILE: str = "file_strategy.json"
     
-    # 文件处理默认配置
-    DEFAULT_CHUNK_SIZE: int = 2000
-    DEFAULT_OVERLAP_SIZE: int = 200
-    DEFAULT_PRESERVE_MARKDOWN: bool = True
-    DEFAULT_SMART_CHUNKING: bool = True
+    # 智能分段默认配置
+    DEFAULT_ENABLE_SMART_SPLIT: bool = True
+    DEFAULT_MAX_TOKENS: int = 8000
+    DEFAULT_MIN_TOKENS: int = 300
+    DEFAULT_SPLIT_STRATEGY: str = "balanced"
     
     # 使用Pydantic v2配置语法
     model_config = {

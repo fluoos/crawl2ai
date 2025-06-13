@@ -94,65 +94,140 @@
         <a-tab-pane key="fileStrategy" tab="文件策略配置">
           <div class="tab-content">
             <a-spin :spinning="strategyLoading">
-              <a-form
-                :model="strategyForm"
-                :label-col="{ span: 6 }"
-                :wrapper-col="{ span: 12 }"
-                @finish="saveStrategy"
-              >
-                <a-form-item 
-                  label="段落分割大小(字符数)" 
-                  name="chunkSize"
-                >
-                  <a-input-number
-                    v-model:value="strategyForm.chunkSize"
-                    :min="500"
-                    :max="10000"
-                    :step="100"
-                    style="width: 150px"
+              <div class="strategy-config-container">
+                <!-- 配置说明 -->
+                <div class="config-description">
+                  <a-alert
+                    message="智能分段配置"
+                    description="智能分段功能会根据内容语义自动分割Markdown文件，适用于RAG检索和大模型训练微调场景。配置将应用于所有文件处理操作。"
+                    type="info"
+                    show-icon
+                    :style="{ marginBottom: '24px' }"
                   />
-                  <div class="form-item-help">将Markdown文件按多少字符分割为一个段落</div>
-                </a-form-item>
-                
-                <a-form-item 
-                  label="段落重叠大小(字符数)" 
-                  name="overlapSize"
+                </div>
+
+                <a-form
+                  :model="strategyForm"
+                  layout="vertical"
+                  @finish="saveStrategy"
+                  class="strategy-form"
                 >
-                  <a-input-number
-                    v-model:value="strategyForm.overlapSize"
-                    :min="0"
-                    :max="1000"
-                    :step="50"
-                    style="width: 150px"
-                  />
-                  <div class="form-item-help">相邻段落之间的重叠字符数，有助于保持上下文连贯性</div>
-                </a-form-item>
-                
-                <a-form-item 
-                  label="保留Markdown格式" 
-                  name="preserveMarkdown"
-                >
-                  <a-switch v-model:checked="strategyForm.preserveMarkdown" />
-                  <div class="form-item-help">开启后，分割时会尽量保持Markdown格式结构的完整性</div>
-                </a-form-item>
-                
-                <a-form-item 
-                  label="智能分段" 
-                  name="smartChunking"
-                >
-                  <a-switch v-model:checked="strategyForm.smartChunking" />
-                  <div class="form-item-help">开启后，系统会尝试根据段落内容的语义边界进行分割</div>
-                </a-form-item>
-                
-                <a-form-item :wrapper-col="{ offset: 6 }">
-                  <a-button type="primary" html-type="submit" :loading="strategySubmitLoading">
-                    保存策略配置
-                  </a-button>
-                  <a-button style="margin-left: 10px" @click="handleResetStrategy">
-                    重置
-                  </a-button>
-                </a-form-item>
-              </a-form>
+                  <!-- 智能分段开关 -->
+                  <div class="config-section">
+                    <div class="section-title">
+                      <span class="title-text">智能分段设置</span>
+                    </div>
+                    <a-form-item 
+                      name="enableSmartSplit"
+                      class="switch-item"
+                    >
+                      <div class="switch-container">
+                        <a-switch 
+                          v-model:checked="strategyForm.enableSmartSplit" 
+                          checked-children="开启"
+                          un-checked-children="关闭"
+                          size="default"
+                        />
+                        <div class="switch-content">
+                          <span class="switch-label">启用智能分段</span>
+                          <div class="switch-desc">开启后，系统将使用智能算法对Markdown文件进行语义化分段</div>
+                        </div>
+                      </div>
+                    </a-form-item>
+                  </div>
+                  
+                  <!-- 智能分段详细配置 -->
+                  <template v-if="strategyForm.enableSmartSplit">
+                    <div class="config-section smart-config-section">
+                      <div class="section-title">
+                        <span class="title-text">分段参数配置</span>
+                      </div>
+                      
+                      <a-form-item 
+                        label="最大Token数" 
+                        name="maxTokens"
+                        class="config-item"
+                      >
+                        <a-input-number 
+                          v-model:value="strategyForm.maxTokens"
+                          :min="500"
+                          :max="20000"
+                          :step="100"
+                          size="large"
+                          placeholder="8000"
+                          class="number-input"
+                          :formatter="value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')"
+                          :parser="value => value.replace(/\$\s?|(,*)/g, '')"
+                        />
+                        <div class="form-item-help">
+                          设置每个分段的最大Token数量，建议范围：2000-10000
+                        </div>
+                      </a-form-item>
+                      
+                      <a-form-item 
+                        label="最小Token数" 
+                        name="minTokens"
+                        class="config-item"
+                      >
+                        <a-input-number 
+                          v-model:value="strategyForm.minTokens"
+                          :min="100"
+                          :max="2000"
+                          :step="50"
+                          size="large"
+                          placeholder="300"
+                          class="number-input"
+                          :formatter="value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')"
+                          :parser="value => value.replace(/\$\s?|(,*)/g, '')"
+                        />
+                        <div class="form-item-help">
+                          设置每个分段的最小Token数量，避免分段过小影响语义完整性
+                        </div>
+                      </a-form-item>
+                      
+                      <a-form-item 
+                        label="分段策略" 
+                        name="splitStrategy"
+                        class="config-item"
+                      >
+                        <a-select 
+                          v-model:value="strategyForm.splitStrategy"
+                          placeholder="选择分段策略"
+                          size="large"
+                          class="strategy-select"
+                        >
+                          <a-select-option value="conservative">🛡️ 保守策略 - 较少分段，保持内容完整性</a-select-option>
+                          <a-select-option value="balanced">⚖️ 平衡策略 - 兼顾完整性和检索效果（推荐）</a-select-option>
+                          <a-select-option value="aggressive">🎯 积极策略 - 更多分段，适合精细检索</a-select-option>
+                        </a-select>
+                        <div class="form-item-help">
+                          选择合适的分段策略以平衡内容完整性和搜索效果，建议使用平衡策略
+                        </div>
+                      </a-form-item>
+                    </div>
+                  </template>
+
+                  <!-- 操作按钮 -->
+                  <div class="form-actions">
+                    <a-button 
+                      type="primary" 
+                      html-type="submit" 
+                      :loading="strategySubmitLoading"
+                      size="large"
+                      class="save-btn"
+                    >
+                      保存配置
+                    </a-button>
+                    <a-button 
+                      @click="handleResetStrategy"
+                      size="large"
+                      class="reset-btn"
+                    >
+                      重置为默认
+                    </a-button>
+                  </div>
+                </a-form>
+              </div>
             </a-spin>
           </div>
         </a-tab-pane>
@@ -246,7 +321,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue';
 import { message, Modal } from 'ant-design-vue';
-import { PlusOutlined } from '@ant-design/icons-vue';
+import { PlusOutlined, SaveOutlined, ReloadOutlined } from '@ant-design/icons-vue';
 import {
   getModelList,
   addModel,
@@ -339,10 +414,11 @@ const promptsForm = reactive({
 const strategyLoading = ref(false);
 const strategySubmitLoading = ref(false);
 const strategyForm = reactive({
-  chunkSize: 2000,
-  overlapSize: 200,
-  preserveMarkdown: true,
-  smartChunking: true
+  // 智能分段配置
+  enableSmartSplit: true,
+  maxTokens: 8000,
+  minTokens: 300,
+  splitStrategy: 'balanced'
 });
 
 // 初始化
@@ -399,11 +475,12 @@ const fetchStrategy = async () => {
   try {
     const response = await getFileStrategy();
     if (response && response.data) {
-      const data = response.data
-      strategyForm.chunkSize = data.chunkSize || 2000;
-      strategyForm.overlapSize = data.overlapSize || 200;
-      strategyForm.preserveMarkdown = data.preserveMarkdown !== false;
-      strategyForm.smartChunking = data.smartChunking !== false;
+      const data = response.data;
+      // 智能分段配置
+      strategyForm.enableSmartSplit = data.enableSmartSplit !== false;
+      strategyForm.maxTokens = data.maxTokens || 8000;
+      strategyForm.minTokens = data.minTokens || 300;
+      strategyForm.splitStrategy = data.splitStrategy || 'balanced';
     }
   } catch (error) {
     message.error('获取文件策略配置失败');
@@ -615,5 +692,254 @@ const handleResetStrategy = async () => {
   color: rgba(0, 0, 0, 0.45);
   font-size: 14px;
   margin-top: 4px;
+}
+
+/* 文件策略配置容器 */
+.strategy-config-container {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+/* 配置说明 */
+.config-description {
+  margin-bottom: 20px;
+}
+
+/* 策略表单 */
+.strategy-form {
+  padding: 0;
+}
+
+/* 配置区块 */
+.config-section {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+  border: 1px solid #f0f0f0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+  transition: all 0.3s ease;
+}
+
+.config-section:hover {
+  border-color: #d9d9d9;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+/* 区块标题 */
+.section-title {
+  display: flex;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #f0f2f5;
+}
+
+.title-icon {
+  font-size: 20px;
+  margin-right: 12px;
+}
+
+.title-text {
+  font-size: 16px;
+  font-weight: 600;
+  color: #262626;
+}
+
+/* 开关容器 */
+.switch-container {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.switch-content {
+  flex: 1;
+}
+
+.switch-label {
+  font-size: 16px;
+  font-weight: 500;
+  color: #262626;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.switch-desc {
+  font-size: 14px;
+  color: #8c8c8c;
+  line-height: 1.5;
+}
+
+.switch-item {
+  margin-bottom: 0 !important;
+}
+
+/* 智能分段配置区块 */
+.smart-config-section {
+  background: linear-gradient(135deg, #f8fbff 0%, #f0f8ff 100%);
+  border: 1px solid #e6f3ff;
+}
+
+.smart-config-section:hover {
+  border-color: #91caff;
+}
+
+/* 配置项 */
+.config-item {
+  margin-bottom: 20px !important;
+}
+
+.config-item .ant-form-item-label > label {
+  font-size: 15px;
+  font-weight: 500;
+  color: #262626;
+}
+
+/* 数字输入框 */
+.number-input {
+  width: 100% !important;
+  border-radius: 8px;
+}
+
+.number-input .ant-input-number-input {
+  font-size: 16px;
+  font-weight: 500;
+}
+
+/* 策略选择框 */
+.strategy-select {
+  width: 100%;
+  border-radius: 8px;
+}
+
+.strategy-select .ant-select-selector {
+  border-radius: 8px !important;
+  height: 44px !important;
+  padding: 0 12px !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+.strategy-select .ant-select-selection-search {
+  display: flex !important;
+  align-items: center !important;
+}
+
+.strategy-select .ant-select-selection-search-input {
+  height: 44px !important;
+  line-height: 44px !important;
+}
+
+.strategy-select .ant-select-selection-item {
+  display: flex !important;
+  align-items: center !important;
+  height: 44px !important;
+  line-height: 44px !important;
+  font-size: 16px !important;
+  font-weight: 500 !important;
+}
+
+.strategy-select .ant-select-selection-placeholder {
+  display: flex !important;
+  align-items: center !important;
+  height: 44px !important;
+  line-height: 44px !important;
+  font-size: 16px !important;
+}
+
+/* 下拉选项样式 */
+.strategy-select .ant-select-item-option {
+  padding: 12px 16px !important;
+  font-size: 14px !important;
+  line-height: 1.5 !important;
+}
+
+.strategy-select .ant-select-item-option-selected {
+  background-color: #e6f3ff !important;
+  font-weight: 500 !important;
+}
+
+/* 帮助文本 */
+.form-item-help {
+  display: flex;
+  align-items: flex-start;
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: #fafafa;
+  border-radius: 6px;
+  color: #666;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.help-icon {
+  margin-right: 6px;
+  flex-shrink: 0;
+}
+
+/* 操作按钮 */
+.form-actions {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  padding: 24px 0 12px;
+  margin-top: 20px;
+}
+
+.save-btn {
+  min-width: 140px;
+  height: 44px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 500;
+  box-shadow: 0 2px 4px rgba(24, 144, 255, 0.2);
+}
+
+.save-btn:hover {
+  box-shadow: 0 4px 8px rgba(24, 144, 255, 0.3);
+  transform: translateY(-1px);
+}
+
+.reset-btn {
+  min-width: 140px;
+  height: 44px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.reset-btn:hover {
+  border-color: #faad14;
+  color: #faad14;
+  transform: translateY(-1px);
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .strategy-config-container {
+    max-width: 100%;
+    padding: 0 16px;
+  }
+  
+  .config-section {
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  
+  .switch-container {
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .form-actions {
+    flex-direction: column;
+  }
+  
+  .save-btn,
+  .reset-btn {
+    width: 100%;
+  }
 }
 </style> 

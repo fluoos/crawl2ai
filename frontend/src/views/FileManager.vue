@@ -118,13 +118,21 @@
     <!-- 智能分段配置弹窗 -->
     <a-modal
       v-model:visible="smartSplitConfigVisible"
-      title="智能分段配置"
+      title="智能分段配置 (系统级配置)"
       @ok="saveSmartSplitConfig"
-      okText="保存配置"
+      okText="保存到系统配置"
       cancelText="取消"
       width="600px"
     >
       <a-form layout="vertical" :style="{ marginTop: '-8px' }">
+        <a-alert 
+          message="系统级配置" 
+          description="此配置将应用于所有文件的智能分段处理，包括文件上传和链接转换。配置保存后立即生效。" 
+          type="info" 
+          show-icon 
+          :style="{ marginBottom: '16px' }"
+        />
+        
         <!-- 智能分段设置 -->
         <div class="settings-section">
           <div class="section-header">
@@ -207,6 +215,7 @@ import { ReloadOutlined, SettingOutlined } from '@ant-design/icons-vue';
 import DataTable from '../components/common/DataTable.vue';
 import FileUploader from '../components/common/FileUploader.vue';
 import { getFileList, convertToDataset, getFilePreview, deleteFiles } from '../services/files';
+import { getFileStrategy, updateFileStrategy } from '../services/system';
 import wsService from '../services/websocket';
 
 // 表格数据
@@ -242,7 +251,7 @@ const smartSplitConfigVisible = ref(false);
 const smartSplitConfig = reactive({
   enableSmartSplit: true,
   maxTokens: 8000,
-  minTokens: 500,
+  minTokens: 300,
   splitStrategy: 'balanced'
 });
 
@@ -279,6 +288,7 @@ const columns = [
 // 初始化
 onMounted(() => {
   fetchFileList();
+  fetchSmartSplitConfig();
   wsService.on('ws:md_to_dataset_convert_progress', handleConvertProgress);
 });
 
@@ -451,13 +461,49 @@ const showSmartSplitConfig = () => {
   smartSplitConfigVisible.value = true;
 };
 
+// 获取智能分段配置
+const fetchSmartSplitConfig = async () => {
+  try {
+    const response = await getFileStrategy();
+    if (response && response.data) {
+      const data = response.data;
+      // 更新智能分段配置
+      smartSplitConfig.enableSmartSplit = data.enableSmartSplit !== false;
+      smartSplitConfig.maxTokens = data.maxTokens || 8000;
+      smartSplitConfig.minTokens = data.minTokens || 300;
+      smartSplitConfig.splitStrategy = data.splitStrategy || 'balanced';
+      // 同步主开关状态
+      smartSplitEnabled.value = smartSplitConfig.enableSmartSplit;
+    }
+  } catch (error) {
+    console.error('获取智能分段配置失败:', error);
+  }
+};
+
 // 保存智能分段配置
-const saveSmartSplitConfig = () => {
-  message.success('智能分段配置已保存, 临时有效，刷新页面后失效');
-  smartSplitConfigVisible.value = false;
-  
-  // 同步主开关状态
-  smartSplitEnabled.value = smartSplitConfig.enableSmartSplit;
+const saveSmartSplitConfig = async () => {
+  try {
+    const configData = {
+      enableSmartSplit: smartSplitConfig.enableSmartSplit,
+      maxTokens: smartSplitConfig.maxTokens,
+      minTokens: smartSplitConfig.minTokens,
+      splitStrategy: smartSplitConfig.splitStrategy
+    };
+    
+    const response = await updateFileStrategy(configData);
+    if (response && response.status === 'success') {
+      message.success('智能分段配置已保存到系统配置');
+    } else {
+      message.error('保存智能分段配置失败');
+    }
+    
+    smartSplitConfigVisible.value = false;
+    // 同步主开关状态
+    smartSplitEnabled.value = smartSplitConfig.enableSmartSplit;
+  } catch (error) {
+    console.error('保存智能分段配置失败:', error);
+    message.error('保存智能分段配置失败');
+  }
 };
 
 // 格式化文件大小

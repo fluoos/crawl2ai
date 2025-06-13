@@ -1,6 +1,6 @@
 <div align="center">
 
-**一个强大的大模型数据集生成工具**
+**一个强大的大模型微调数据集生成和管理工具**
 
 [简体中文](./README.md) | [English](./README.en.md)
 
@@ -8,7 +8,7 @@
 
 # 数据集生成、大模型微调工具
 
-大模型数据集生成和微调工具，一键爬取指定域名的链接，支持把链接转换成大模型友好的Markdown文件，支持将Markdown文件通过ChatGPT、Deepseek、Gemma等大模型转换成训练大模型可用的数据集。
+大模型微调数据集生成和管理工具，一键爬取指定域名的链接，支持把链接转换成大模型友好的Markdown文件，支持将Markdown文件通过ChatGPT、Deepseek、Gemma等大模型转换成训练大模型可用的数据集。
 
 ## 功能特点
 
@@ -166,24 +166,6 @@ npm run dev
 └── requirements.txt        # Python依赖文件
 ```
 
-## 大模型返回数据格式
-
-输入文件 `qa_dataset.jsonl` 应为JSONL格式，每行包含一个JSON对象，要求包含以下字段：
-
-```json
-{
-  "question": "问题内容",
-  "answer": "答案内容",
-  "label": "标签（可选）"
-}
-```
-
-## 支持的输出格式
-
-1. **Alpaca格式**：适用于指令微调
-2. **ShareGPT格式**：适用于对话微调
-3. **自定义格式**：可自定义字段映射
-
 ## 常见问题处理
 
 1. 运行过程如果提示下面报错
@@ -195,3 +177,10 @@ No module named 'onnxruntime'
 pip install 'markitdown[all]'
 pip install onnxruntime
 ```
+
+### 贡献
+
+如果你有好的意见或建议，欢迎给我们提issue或pull request。
+
+### License
+The MIT License(http://opensource.org/licenses/MIT)
