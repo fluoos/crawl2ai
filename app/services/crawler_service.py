@@ -1,16 +1,24 @@
 import time
 import os
+import sys
 import asyncio
 import logging
 import json
-from multiprocessing import Process
 from pathlib import Path
 from datetime import datetime
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urljoin, urlunparse
 from typing import List, Optional, Dict, Any, Set
+from concurrent.futures import ThreadPoolExecutor
 import uuid
+import re
 from app.core.config import settings
 from app.services.system_service import SystemService
+from app.services.notification_service import (
+    send_convert_start,
+    send_convert_progress,
+    send_convert_complete,
+    send_convert_failed
+)
 from app.utils.path_utils import (
     join_paths, 
     get_output_path,
@@ -18,19 +26,30 @@ from app.utils.path_utils import (
     ensure_dir
 )
 
-# 导入crawl4ai库
-from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, BrowserConfig, MemoryAdaptiveDispatcher, CrawlerMonitor, DisplayMode
-from crawl4ai.deep_crawling import BFSDeepCrawlStrategy, DFSDeepCrawlStrategy
+# 替换 crawl4ai 的导入，使用轻量级替代方案
+import aiohttp
 
 # 导入智能分段工具
 from app.core.markdown_splitter import MarkdownSplitter
 
+# 导入爬虫引擎服务
+from app.services.crawler_engine_service import (
+    CrawlerEngineService,
+    CrawlStrategy,
+    BFSCrawlStrategy, 
+    DFSCrawlStrategy,
+    BeautifulSoupCrawler
+)
+
 
 class CrawlerService:
     """爬虫服务类，提供爬虫相关的业务逻辑"""
+    
+    # 类变量用于跟踪运行中的任务
+    _running_tasks: Dict[str, asyncio.Task] = {}
 
     @staticmethod
-    def start_crawl_process(
+    async def start_crawl_task(
         url: str,
         max_depth: int = settings.DEFAULT_MAX_DEPTH,
         max_pages: int = settings.DEFAULT_MAX_PAGES,
@@ -40,36 +59,66 @@ class CrawlerService:
         force_refresh: bool = False,
         project_id: Optional[str] = None
     ) -> Dict[str, Any]:
-        """启动爬虫进程，爬取指定URL的链接"""
+        """启动爬虫异步任务，爬取指定URL的链接"""
         try:
-            # 使用进程替代线程，因为Crawl4AI的异步爬取在多线程环境下会有运行问题
-            process = Process(
-                target=CrawlerService.crawl_urls_process,
-                args=(
-                    url,
-                    max_depth,
-                    max_pages,
-                    include_patterns,
-                    exclude_patterns,
-                    crawl_strategy,
-                    force_refresh,
-                    project_id
+            # 生成任务ID
+            task_id = f"crawl_{project_id}_{int(time.time())}"
+            
+            # 创建异步任务
+            task = asyncio.create_task(
+                CrawlerService.crawl_urls_async(
+                    start_url=url,
+                    max_depth=max_depth,
+                    max_pages=max_pages,
+                    include_patterns=include_patterns,
+                    exclude_patterns=exclude_patterns,
+                    crawl_strategy=crawl_strategy,
+                    force_refresh=force_refresh,
+                    project_id=project_id
                 )
             )
-            process.daemon = True
-            process.start()
-            # 将进程ID保存到文件
-            with open(get_project_output_path(project_id, "crawler_process.json"), "w") as f:
-                json.dump({"pid": process.pid, "start_time": time.time()}, f)
             
-            print(f"后台任务创建成功，进程ID: {process.pid}")
+            # 保存任务引用
+            CrawlerService._running_tasks[task_id] = task
+            
+            # 将任务信息保存到文件
+            with open(get_project_output_path(project_id, "crawler_task.json"), "w") as f:
+                json.dump({"task_id": task_id, "start_time": time.time()}, f)
+            
+            # 设置任务完成回调
+            task.add_done_callback(lambda t: CrawlerService._cleanup_task(task_id))
+            
+            print(f"后台异步任务创建成功，任务ID: {task_id}")
             return {
                 "status": "success",
                 "message": f"爬虫任务已开始，使用{crawl_strategy}策略，请稍后查看结果"
             }
         except Exception as e:
-            logging.error(f"启动爬虫进程失败: {str(e)}")
+            logging.error(f"启动爬虫任务失败: {str(e)}")
             raise
+
+    @staticmethod
+    def _cleanup_task(task_id: str):
+        """清理完成的任务"""
+        try:
+            if task_id in CrawlerService._running_tasks:
+                task = CrawlerService._running_tasks[task_id]
+                # 检查任务是否有异常
+                if task.done() and not task.cancelled():
+                    try:
+                        # 获取任务结果，如果有异常会被抛出
+                        task.result()
+                        print(f"任务 {task_id} 成功完成")
+                    except Exception as e:
+                        logging.error(f"任务 {task_id} 执行时发生异常: {str(e)}")
+                        print(f"任务 {task_id} 执行失败: {str(e)}")
+                elif task.cancelled():
+                    print(f"任务 {task_id} 已被取消")
+                
+                del CrawlerService._running_tasks[task_id]
+                print(f"已清理任务: {task_id}")
+        except Exception as e:
+            logging.error(f"清理任务时出错: {str(e)}")
 
     @staticmethod
     def stop_crawl(project_id: Optional[str] = None) -> Dict[str, Any]:
@@ -78,10 +127,9 @@ class CrawlerService:
         with open(get_project_output_path(project_id, "crawler_status.json"), "w", encoding="utf-8") as f:
             json.dump({"status": "stopped", "message": "爬虫任务已手动停止"}, f)
 
-        process_info_file = get_project_output_path(project_id, "crawler_process.json")
-        # 检查是否有记录的爬虫进程
-        if not os.path.exists(process_info_file):
-            
+        task_info_file = get_project_output_path(project_id, "crawler_task.json")
+        # 检查是否有记录的爬虫任务
+        if not os.path.exists(task_info_file):
             return {
                 "status": "warning",
                 "message": "没有找到正在运行的爬虫任务信息",
@@ -89,27 +137,35 @@ class CrawlerService:
                 "count": 0
             }
         
-        # 读取进程信息
-        with open(process_info_file, "r") as f:
-            process_info = json.load(f)
+        # 读取任务信息
+        with open(task_info_file, "r") as f:
+            task_info = json.load(f)
         
-        pid = process_info.get("pid")
+        task_id = task_info.get("task_id")
         
-        # 检查进程是否存在
-        import psutil
-        process_exists = False
-        try:
-            process = psutil.Process(pid)
-            process_exists = process.is_running()
-        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-            process_exists = False
+        # 检查任务是否存在并且正在运行
+        task_found = False
+        if task_id and task_id in CrawlerService._running_tasks:
+            task = CrawlerService._running_tasks[task_id]
+            if not task.done():
+                # 取消任务
+                task.cancel()
+                task_found = True
+                print(f"已取消运行中的任务: {task_id}")
+            else:
+                # 任务已完成，清理引用
+                del CrawlerService._running_tasks[task_id]
+                print(f"任务已完成: {task_id}")
         
-        if not process_exists:
-            # 删除进程信息文件
-            os.remove(process_info_file)
+        if not task_found:
+            # 删除任务信息文件
+            try:
+                os.remove(task_info_file)
+            except:
+                pass
             return {
                 "status": "warning",
-                "message": "爬虫进程已不存在",
+                "message": "爬虫任务已不存在或已完成",
                 "urls": [],
                 "count": 0
             }
@@ -118,21 +174,9 @@ class CrawlerService:
         with open(get_project_output_path(project_id, "stop_crawler.flag"), "w") as f:
             f.write("stop")
         
-        # 尝试终止进程
+        # 删除任务信息文件
         try:
-            process.terminate()
-            gone, alive = psutil.wait_procs([process], timeout=3)
-            
-            # 如果进程仍然活着，强制杀死
-            if process in alive:
-                process.kill()
-        except Exception as e:
-            logging.error(f"终止进程时出错: {str(e)}")
-        
-        
-        # 删除进程信息文件
-        try:
-            os.remove(process_info_file)
+            os.remove(task_info_file)
         except:
             pass
         
@@ -267,7 +311,7 @@ class CrawlerService:
             raise
 
     @staticmethod
-    def start_convert_process(
+    async def start_convert_task(
         urls: List[str],
         included_selector: Optional[str] = None,
         excluded_selector: Optional[str] = None,
@@ -277,7 +321,7 @@ class CrawlerService:
         split_strategy: Optional[str] = "balanced",
         project_id: Optional[str] = None
     ) -> Dict[str, Any]:
-        """启动URL转换为Markdown的进程"""
+        """启动URL转换为Markdown的异步任务"""
         if not urls:
             print("没有需要转换的URL")
             return {
@@ -293,137 +337,54 @@ class CrawlerService:
         # 设置默认输出目录
         output_dir = join_paths(settings.OUTPUT_DIR, str(project_id), "markdown")
         try:
-            # 使用进程来执行转换任务
-            process = Process(
-                target=CrawlerService.convert_urls_to_markdown_process,
-                args=(
-                    urls,
-                    output_dir,
-                    included_selector,
-                    excluded_selector,
-                    enable_smart_split,
-                    max_tokens,
-                    min_tokens,
-                    split_strategy,
-                    project_id
+            # 生成任务ID
+            task_id = f"convert_{project_id}_{int(time.time())}"
+            
+            # 创建异步任务
+            task = asyncio.create_task(
+                CrawlerService.convert_urls_to_markdown(
+                    urls=urls,
+                    output_dir=output_dir,
+                    included_selector=included_selector,
+                    excluded_selector=excluded_selector,
+                    enable_smart_split=enable_smart_split,
+                    max_tokens=max_tokens,
+                    min_tokens=min_tokens,
+                    split_strategy=split_strategy,
+                    project_id=project_id
                 )
             )
-            process.daemon = True
-            process.start()
             
-            # 将进程ID保存到文件
-            with open(get_project_output_path(project_id, "convert_process.json"), "w") as f:
-                json.dump({"pid": process.pid, "start_time": time.time()}, f)
+            # 保存任务引用
+            CrawlerService._running_tasks[task_id] = task
+            
+            # 将任务信息保存到文件
+            with open(get_project_output_path(project_id, "convert_task.json"), "w") as f:
+                json.dump({"task_id": task_id, "start_time": time.time()}, f)
+            
+            # 设置任务完成回调
+            task.add_done_callback(lambda t: CrawlerService._cleanup_task(task_id))
             
             smart_split_info = f"，智能分段: {'开启' if enable_smart_split else '关闭'}"
-            print(f"转换任务已开始，进程ID: {process.pid}{smart_split_info}")
+            print(f"转换任务已开始，任务ID: {task_id}{smart_split_info}")
             
             return {
                 "status": "success",
                 "message": f"转换任务已开始，共{len(urls)}个URL{smart_split_info}，请稍后查看结果"
             }
         except Exception as e:
-            logging.error(f"启动转换进程失败: {str(e)}")
+            logging.error(f"启动转换任务失败: {str(e)}")
             raise
-
-    @staticmethod
-    def crawl_urls_process(
-        url, 
-        max_depth=settings.DEFAULT_MAX_DEPTH, 
-        max_pages=settings.DEFAULT_MAX_PAGES, 
-        include_patterns=None, 
-        exclude_patterns=None, 
-        crawl_strategy=settings.DEFAULT_CRAWL_STRATEGY, 
-        force_refresh=False,
-        project_id=None
-    ):
-        """在独立进程中运行爬虫任务"""
-        # 多进程环境下需要设置共享状态（使用文件）
-        if project_id:
-            project_dir = join_paths(settings.OUTPUT_DIR, str(project_id))
-            ensure_dir(project_dir)
-        else:
-            ensure_dir(settings.OUTPUT_DIR)
-            
-        with open(get_project_output_path(project_id, "crawler_status.json"), "w", encoding="utf-8") as f:
-            json.dump({"status": "running", "message": f"爬虫任务正在进行中（{crawl_strategy}策略）..."}, f)
-        
-        try:
-            # 在新进程中，直接使用asyncio.run是安全的
-            asyncio.run(CrawlerService.crawl_urls_async(
-                start_url=url,
-                max_depth=max_depth,
-                max_pages=max_pages,
-                include_patterns=include_patterns,
-                exclude_patterns=exclude_patterns,
-                crawl_strategy=crawl_strategy,
-                force_refresh=force_refresh,
-                project_id=project_id
-            ))
-        except Exception as e:
-            # 记录错误
-            with open(get_project_output_path(project_id, "crawler_status.json"), "w", encoding="utf-8") as f:
-                json.dump({"status": "failed", "message": f"爬虫任务失败: {str(e)}"}, f)
-            print(f"爬虫任务失败: {str(e)}")
-
-    @staticmethod
-    def convert_urls_to_markdown_process(
-        urls, 
-        output_dir,
-        included_selector=None,
-        excluded_selector=None,
-        enable_smart_split=False,
-        max_tokens=8000,
-        min_tokens=500,
-        split_strategy="balanced",
-        project_id=None
-    ):
-        """在独立进程中运行URL到Markdown的转换任务"""
-        # 记录转换任务开始
-        ensure_dir(output_dir)
-            
-        with open(get_project_output_path(project_id, "convert_status.json"), "w", encoding="utf-8") as f:
-            json.dump({"status": "running", "message": f"转换任务正在进行中，共{len(urls)}个URL..."}, f)
-        
-        try:
-            # 在新进程中运行异步函数，使用asyncio.run是安全的
-            asyncio.run(CrawlerService.convert_urls_to_markdown(
-                urls=urls,
-                output_dir=output_dir,
-                included_selector=included_selector,
-                excluded_selector=excluded_selector,
-                enable_smart_split=enable_smart_split,
-                max_tokens=max_tokens,
-                min_tokens=min_tokens,
-                split_strategy=split_strategy,
-                project_id=project_id
-            ))
-            
-            # 更新状态为已完成
-            with open(get_project_output_path(project_id, "convert_status.json"), "w", encoding="utf-8") as f:
-                json.dump({"status": "completed", "message": "转换任务已完成"}, f)
-        except Exception as e:
-            # 记录错误
-            with open(get_project_output_path(project_id, "convert_status.json"), "w", encoding="utf-8") as f:
-                json.dump({"status": "failed", "message": f"转换任务失败: {str(e)}"}, f)
-            print(f"转换任务失败: {str(e)}")
 
     @staticmethod
     def process_url(url):
         """处理URL，确保使用https协议"""
-        if url.startswith('http://'):
-            return url.replace('http://', 'https://', 1)
-        return url
+        return CrawlerEngineService.process_url(url)
 
     @staticmethod
     def url_to_filename(url):
         """将URL转换为文件名"""
-        parsed = urlparse(url)
-        path = parsed.path.replace('.html', '')
-        filename = path.strip('/').replace('/', '_')
-        if not filename:
-            filename = parsed.netloc
-        return f"{filename}.md"
+        return CrawlerEngineService.url_to_filename(url)
 
     @staticmethod
     def get_existing_files(output_dir):
@@ -447,7 +408,7 @@ class CrawlerService:
         project_id: Optional[str] = None
     ) -> Set[str]:
         """
-        使用crawl4ai异步爬取URL并保存到文件
+        使用 BeautifulSoup + aiohttp 异步爬取URL并保存到文件
         
         Args:
             start_url: 起始URL
@@ -466,6 +427,10 @@ class CrawlerService:
             ensure_dir(project_dir)
         else:
             ensure_dir(settings.OUTPUT_DIR)
+            
+        # 设置运行状态
+        with open(get_project_output_path(project_id, "crawler_status.json"), "w", encoding="utf-8") as f:
+            json.dump({"status": "running", "message": f"爬虫任务正在进行中（{crawl_strategy}策略）..."}, f)
             
         # 保存更详细的JSON格式
         output_json_file = get_project_output_path(project_id, "crawled_urls.json")
@@ -500,82 +465,114 @@ class CrawlerService:
                     count = 0
 
         # 选择爬取策略
-        if crawl_strategy == "dfs":
-            crawl_strategy_obj = DFSDeepCrawlStrategy(
-                max_depth=max_depth,
-                include_external=False,  # 默认不包含外部链接
-                max_pages=max_pages,
-            )
-        else:  # 默认使用BFS
-            crawl_strategy_obj = BFSDeepCrawlStrategy(
-                max_depth=max_depth,
-                include_external=False,  # 默认不包含外部链接
-                max_pages=max_pages,
-            )
-        
-        # 配置爬虫
-        config = CrawlerRunConfig(
-            deep_crawl_strategy=crawl_strategy_obj,
-            stream=True,  # 使用流式输出
+        crawl_strategy_obj = CrawlerEngineService.create_crawl_strategy(
+            crawl_strategy, max_depth, max_pages
         )
-
+        
         print(f"开始爬取，策略: {crawl_strategy}")
-        # 使用crawl4ai进行爬取
+        # 使用新的 BeautifulSoup 爬虫替代 crawl4ai
         try:
-            async with AsyncWebCrawler() as crawler:
-                # 使用async for获取流式结果
-                async for result in await crawler.arun(start_url, config=config):
-                    url = result.url
-                    # 获取元数据
-                    depth = result.metadata.get("depth", 0) if hasattr(result, "metadata") else 0
-                    score = result.metadata.get("score", 0) if hasattr(result, "metadata") else 0
+            async with aiohttp.ClientSession(
+                timeout=aiohttp.ClientTimeout(total=30),
+                connector=aiohttp.TCPConnector(limit=10)
+            ) as session:
+                crawler = CrawlerEngineService.create_crawler(session)
+                
+                # 使用策略模式初始化爬取队列
+                crawl_strategy_obj.add_url(start_url, 0, 0)  # 添加起始URL
+                visited_urls = set()
+                
+                while crawl_strategy_obj.has_urls() and len(crawled_urls) < max_pages:
+                    # 使用策略获取下一个URL
+                    url_info = crawl_strategy_obj.get_next_url()
+                    if not url_info:
+                        break
+                    current_url, depth, score = url_info
                     
-                    print(f"爬取: 深度={depth} | 得分={score:.2f} | URL={url}")
-                    
-                    # 去重检查，不同协议的相当于同一个URL
-                    fix_url = CrawlerService.process_url(url)
-                    if fix_url in crawled_urls:
+                    # 检查是否已访问
+                    if current_url in visited_urls:
                         continue
                     
-                    # 过滤URL
-                    should_include = True
-                    should_exclude = False
+                    visited_urls.add(current_url)
                     
-                    if include_patterns:
-                        should_include = any(pattern in fix_url for pattern in include_patterns)
+                    # 检查停止标志
+                    stop_flag_file = get_project_output_path(project_id, "stop_crawler.flag")
+                    if os.path.exists(stop_flag_file):
+                        print("检测到停止标志，终止爬取")
+                        break
                     
-                    if exclude_patterns:
-                        should_exclude = any(pattern in fix_url for pattern in exclude_patterns)
+                    # 获取页面内容
+                    page_data = await crawler.fetch_page(current_url)
                     
-                    if should_include and not should_exclude:
-                        crawled_urls.add(fix_url)
-                        count = count + 1
-                        data = {
-                            "id": count,
-                            "url": fix_url,
-                            "depth": depth,
-                            "score": score,
-                            "title": result.title if hasattr(result, "title") else "",
-                            "crawled_at": datetime.now().isoformat()
-                        }
-                        crawled_data.append(data)
-                        with open(output_json_file, "w", encoding="utf-8") as f:
-                            json.dump(crawled_data, f, ensure_ascii=False, indent=2)
-                        # 如果爬取的URL数量超过max_pages，则停止爬取，强制完成并更新状态
-                        if count >= max_pages:
-                            print(f"爬取完成，共找到 {count} 个URL")
-                            CrawlerService.stop_crawl(project_id)
-                            with open(get_project_output_path(project_id, "crawler_status.json"), "w", encoding="utf-8") as f:
-                                json.dump({"status": "completed", "message": "爬虫任务已完成"}, f)
-                            break
+                    if page_data['success']:
+                        # 处理URL
+                        fix_url = CrawlerService.process_url(current_url)
+                        
+                        print(f"爬取: 深度={depth} | 得分={score:.2f} | URL={fix_url}")
+                        
+                        # 去重检查
+                        if fix_url in crawled_urls:
+                            continue
+                        
+                        # 过滤URL
+                        should_include = True
+                        should_exclude = False
+                        
+                        if include_patterns:
+                            should_include = any(pattern in fix_url for pattern in include_patterns)
+                        
+                        if exclude_patterns:
+                            should_exclude = any(pattern in fix_url for pattern in exclude_patterns)
+                        
+                        if should_include and not should_exclude:
+                            crawled_urls.add(fix_url)
+                            count = count + 1
+                            data = {
+                                "id": count,
+                                "url": fix_url,
+                                "depth": depth,
+                                "score": score,
+                                "title": page_data['title'],
+                                "crawled_at": datetime.now().isoformat()
+                            }
+                            crawled_data.append(data)
+                            
+                            # 保存到文件
+                            with open(output_json_file, "w", encoding="utf-8") as f:
+                                json.dump(crawled_data, f, ensure_ascii=False, indent=2)
+                            
+                            # 检查是否达到最大页面数
+                            if count >= max_pages:
+                                print(f"爬取完成，共找到 {count} 个URL")
+                                with open(get_project_output_path(project_id, "crawler_status.json"), "w", encoding="utf-8") as f:
+                                    json.dump({"status": "completed", "message": "爬虫任务已完成"}, f)
+                                break
+                        
+                        # 如果深度允许，添加子链接到队列
+                        if depth < max_depth and crawl_strategy_obj.should_crawl(fix_url, depth, count):
+                            for link in page_data['links']:
+                                if link not in visited_urls:
+                                    # 计算链接得分（简单实现）
+                                    link_score = len(link.split('/')) * 0.1  # 根据路径深度计算得分
+                                    
+                                    # 使用策略对象添加URL
+                                    crawl_strategy_obj.add_url(link, depth + 1, link_score)
+                    else:
+                        print(f"爬取失败: {current_url} - {page_data.get('error', 'Unknown error')}")
+                        
+            print(f"爬取完成，共找到 {len(crawled_urls)} 个URL")
+            # 更新状态
+            with open(get_project_output_path(project_id, "crawler_status.json"), "w", encoding="utf-8") as f:
+                json.dump({"status": "completed", "message": "爬虫任务已完成"}, f)
+                
         except Exception as e:
-            logging.error(f"爬取过程中发生错误: {str(e)}")
-            print(f"爬取过程中发生错误: {str(e)}")
-
-        print(f"爬取完成，共找到 {len(crawled_urls)} 个URL")
-        # 更新状态
-        with open(get_project_output_path(project_id, "crawler_status.json"), "w", encoding="utf-8") as f:
-            json.dump({"status": "completed", "message": "爬虫任务已完成"}, f)
+            error_msg = str(e)
+            logging.error(f"爬取过程中发生错误: {error_msg}")
+            print(f"爬取过程中发生错误: {error_msg}")
+            # 记录错误状态
+            with open(get_project_output_path(project_id, "crawler_status.json"), "w", encoding="utf-8") as f:
+                json.dump({"status": "failed", "message": f"爬虫任务失败: {error_msg}"}, f)
+        
         return crawled_urls
 
     @staticmethod
@@ -611,229 +608,235 @@ class CrawlerService:
      
         print(f"准备处理{len(urls)}个URL，输出到{output_dir}")
         
-        browser_config = BrowserConfig(verbose=True)
+        # 设置运行状态
+        with open(get_project_output_path(project_id, "convert_status.json"), "w", encoding="utf-8") as f:
+            json.dump({"status": "running", "message": f"转换任务正在进行中，共{len(urls)}个URL..."}, f)
         
-        # 配置爬虫
-        run_config_dict = {
-            # markdown_generator=DefaultMarkdownGenerator(),
-            # Content filtering
-            # word_count_threshold=10,
-            # excluded_tags=['form', 'header'],
-            # exclude_external_links=True,
-
-            # Content processing
-            # process_iframes=True,
-            # remove_overlay_elements=True,
-            # css_selector="#article-wrap, .article-title, .article-container",
-            # css_selector=".article-title, #article-container-warp",
-            # excluded_selector=".article-pagination",
-            # target_elements=["#article-wrap"], // 无效
-            # Cache control
-            # cache_mode=CacheMode.ENABLED,  # Use cache if available
-            "stream": True
-        }
-        
-        # 添加选择器配置
-        if included_selector:
-            run_config_dict["css_selector"] = included_selector
-        if excluded_selector:
-            run_config_dict["excluded_selector"] = excluded_selector
-            
-        run_config = CrawlerRunConfig(**run_config_dict)
-
         # 用于跟踪进度
         total_urls = len(urls)
         processed_urls = 0
         successful_urls = 0
-        # 生成任务通知的唯一ID，使用uuid
-        task_id = str(uuid.uuid4())
         
-        # 发送初始进度更新
-        SystemService.send_to_websocket({
-            "task_id": task_id,
-            "type": "html_to_md_convert_progress",
-            "status": "started",
-            "progress": 0,
-            "total": total_urls,
-            "processed": 0,
-            "successful": 0,
-            "message": "开始转换URL为Markdown"
-        }, project_id)
+        # 使用新的通知系统
+        notification_service = await send_convert_start(project_id, total_urls)
+        print(f"通知服务初始化成功，任务ID: {notification_service.get_task_id()}")
 
-        async with AsyncWebCrawler(config=browser_config) as crawler:
-            # 该逻辑不能修改，stream=True模式要使用async for result in await
-            async for result in await crawler.arun_many(
-                urls=list(urls),
-                config=run_config,
-            ):
-                processed_urls += 1
-                progress_percent = int(processed_urls / total_urls * 100)
+        try:
+            print("开始创建aiohttp ClientSession...")
+            async with aiohttp.ClientSession(
+                timeout=aiohttp.ClientTimeout(total=30, connect=10),  # 减少超时时间
+                connector=aiohttp.TCPConnector(limit=3, ttl_dns_cache=300, use_dns_cache=True)
+            ) as session:
+                print("ClientSession创建成功，初始化爬虫...")
+                crawler = CrawlerEngineService.create_crawler(session)
                 
-                print(f"已转换链接: {result.url}")
-                if result.success and result.markdown and result.markdown.strip():
-                    successful_urls += 1
+                # 并发处理URL，但限制并发数
+                semaphore = asyncio.Semaphore(1)  # 降低并发数到1，避免死锁
+                print(f"开始处理 {len(urls)} 个URL...")
+                
+                async def process_single_url(url: str):
+                    nonlocal processed_urls, successful_urls
                     
-                    # 根据分段策略调整参数
-                    actual_max_tokens = max_tokens
-                    actual_min_tokens = min_tokens
-                    
-                    if split_strategy == "conservative":
-                        actual_max_tokens = int(max_tokens * 1.2)  # 更大的分段
-                        actual_min_tokens = int(min_tokens * 1.5)
-                    elif split_strategy == "aggressive":
-                        actual_max_tokens = int(max_tokens * 0.8)  # 更小的分段
-                        actual_min_tokens = int(min_tokens * 0.7)
-                    
-                    if enable_smart_split:
-                        # 启用智能分段
+                    async with semaphore:
+                        processed_urls += 1
+                        
+                        print(f"[{processed_urls}/{total_urls}] 开始转换链接: {url}")
+                        
                         try:
-                            print(f"对 {result.url} 启用智能分段 (策略: {split_strategy}, Token范围: {actual_min_tokens}-{actual_max_tokens})")
-                            
-                            # 创建智能分段器
-                            splitter = MarkdownSplitter(
-                                max_tokens=actual_max_tokens,
-                                min_tokens=actual_min_tokens
+                            # 转换URL为Markdown
+                            result = await crawler.convert_to_markdown(
+                                url, 
+                                included_selector=included_selector,
+                                excluded_selector=excluded_selector
                             )
+                            print(f"转换完成: {url} - 成功: {result['success']}")
+                        except Exception as e:
+                            print(f"转换URL时发生异常 {url}: {e}")
+                            result = {
+                                'url': url,
+                                'success': False,
+                                'error': str(e),
+                                'markdown': '',
+                                'title': ''
+                            }
+                        
+                        if result['success'] and result['markdown'] and result['markdown'].strip():
+                            successful_urls += 1
                             
-                            # 执行分段
-                            chunks = splitter.create_chunks(result.markdown)
+                            # 根据分段策略调整参数
+                            actual_max_tokens = max_tokens
+                            actual_min_tokens = min_tokens
                             
-                            if chunks and len(chunks) > 1:
-                                # 获取基础文件名（不含扩展名）
-                                base_filename = CrawlerService.url_to_filename(result.url)
-                                base_name = base_filename.replace('.md', '')
-                                
-                                # 保存每个分段到原目录
-                                for chunk in chunks:
-                                    # 简化文件命名：xxx-1.md, xxx-2.md
-                                    chunk_filename = f"{base_name}-{chunk.order}.md"
-                                    chunk_filepath = join_paths(output_dir, chunk_filename)
+                            if split_strategy == "conservative":
+                                actual_max_tokens = int(max_tokens * 1.2)  # 更大的分段
+                                actual_min_tokens = int(min_tokens * 1.5)
+                            elif split_strategy == "aggressive":
+                                actual_max_tokens = int(max_tokens * 0.8)  # 更小的分段
+                                actual_min_tokens = int(min_tokens * 0.7)
+                            
+                            if enable_smart_split:
+                                # 启用智能分段
+                                try:
+                                    print(f"对 {result['url']} 启用智能分段 (策略: {split_strategy}, Token范围: {actual_min_tokens}-{actual_max_tokens})")
                                     
-                                    # 直接保存分段内容，不添加复杂的元数据
-                                    chunk_content = f"# {chunk.title}\n\n{chunk.content}"
+                                    # 创建智能分段器
+                                    splitter = MarkdownSplitter(
+                                        max_tokens=actual_max_tokens,
+                                        min_tokens=actual_min_tokens
+                                    )
                                     
-                                    with open(chunk_filepath, 'w', encoding='utf-8') as f:
-                                        f.write(chunk_content)
+                                    # 执行分段
+                                    chunks = splitter.create_chunks(result['markdown'])
                                     
-                                    # 为每个分段创建注册表条目（基于文件路径）
-                                    CrawlerService.update_markdown_registry_for_chunk(result.url, chunk_filepath, project_id)
-                                
-                                print(f"已保存智能分段内容: {len(chunks)} 个分段文件到 {output_dir}")
-                                
-                                # 更新爬取URL的文件路径（指向第一个分段）
-                                first_chunk_filepath = join_paths(output_dir, f"{base_name}-1.md")
-                                CrawlerService.update_crawled_url_filepath(result.url, first_chunk_filepath, project_id)
-                                
+                                    if chunks and len(chunks) > 1:
+                                        # 获取基础文件名（不含扩展名）
+                                        base_filename = CrawlerService.url_to_filename(result['url'])
+                                        base_name = base_filename.replace('.md', '')
+                                        
+                                        # 保存每个分段到原目录
+                                        for chunk in chunks:
+                                            # 简化文件命名：xxx-1.md, xxx-2.md
+                                            chunk_filename = f"{base_name}-{chunk.order}.md"
+                                            chunk_filepath = join_paths(output_dir, chunk_filename)
+                                            
+                                            # 直接保存分段内容，不添加复杂的元数据
+                                            chunk_content = f"# {chunk.title}\n\n{chunk.content}"
+                                            
+                                            with open(chunk_filepath, 'w', encoding='utf-8') as f:
+                                                f.write(chunk_content)
+                                            
+                                            # 为每个分段创建注册表条目（基于文件路径）
+                                            CrawlerService.update_markdown_registry_for_chunk(result['url'], chunk_filepath, project_id)
+                                        
+                                        print(f"已保存智能分段内容: {len(chunks)} 个分段文件到 {output_dir}")
+                                        
+                                        # 更新爬取URL的文件路径（指向第一个分段）
+                                        first_chunk_filepath = join_paths(output_dir, f"{base_name}-1.md")
+                                        CrawlerService.update_crawled_url_filepath(result['url'], first_chunk_filepath, project_id)
+                                        
+                                    else:
+                                        # 分段结果少于2个，保存原始内容
+                                        filename = CrawlerService.url_to_filename(result['url'])
+                                        filepath = join_paths(output_dir, filename)
+                                        
+                                        with open(filepath, 'w', encoding='utf-8') as f:
+                                            f.write(result['markdown'])
+                                        print(f"智能分段未产生多个分段，保存原始内容到: {filepath}")
+                                        
+                                        CrawlerService.update_markdown_registry(result['url'], filepath, project_id)
+                                        CrawlerService.update_crawled_url_filepath(result['url'], filepath, project_id)
+                                        
+                                except Exception as e:
+                                    print(f"智能分段失败 {result['url']}: {str(e)}，将保存原始内容")
+                                    # 分段失败，保存原始内容
+                                    filename = CrawlerService.url_to_filename(result['url'])
+                                    filepath = join_paths(output_dir, filename)
+                                    
+                                    with open(filepath, 'w', encoding='utf-8') as f:
+                                        f.write(result['markdown'])
+                                    print(f"已保存原始内容到: {filepath}")
+                                    
+                                    CrawlerService.update_markdown_registry(result['url'], filepath, project_id)
+                                    CrawlerService.update_crawled_url_filepath(result['url'], filepath, project_id)
                             else:
-                                # 分段结果少于2个，保存原始内容
-                                filename = CrawlerService.url_to_filename(result.url)
+                                # 未启用智能分段，保存原始内容
+                                filename = CrawlerService.url_to_filename(result['url'])
                                 filepath = join_paths(output_dir, filename)
                                 
                                 with open(filepath, 'w', encoding='utf-8') as f:
-                                    f.write(result.markdown)
-                                print(f"智能分段未产生多个分段，保存原始内容到: {filepath}")
+                                    f.write(result['markdown'])
+                                print(f"已保存内容到: {filepath}")
                                 
-                                CrawlerService.update_markdown_registry(result.url, filepath, project_id)
-                                CrawlerService.update_crawled_url_filepath(result.url, filepath, project_id)
-                                
-                        except Exception as e:
-                            print(f"智能分段失败 {result.url}: {str(e)}，将保存原始内容")
-                            # 分段失败，保存原始内容
-                            filename = CrawlerService.url_to_filename(result.url)
-                            filepath = join_paths(output_dir, filename)
+                                CrawlerService.update_markdown_registry(result['url'], filepath, project_id)
+                                CrawlerService.update_crawled_url_filepath(result['url'], filepath, project_id)
                             
-                            with open(filepath, 'w', encoding='utf-8') as f:
-                                f.write(result.markdown)
-                            print(f"已保存原始内容到: {filepath}")
+                            # 发送成功通知
+                            success_message = f"已成功转换URL: {result['url']}"
+                            if enable_smart_split:
+                                success_message += f" (智能分段: {split_strategy})"
                             
-                            CrawlerService.update_markdown_registry(result.url, filepath, project_id)
-                            CrawlerService.update_crawled_url_filepath(result.url, filepath, project_id)
-                    else:
-                        # 未启用智能分段，保存原始内容
-                        filename = CrawlerService.url_to_filename(result.url)
-                        filepath = join_paths(output_dir, filename)
-                        
-                        with open(filepath, 'w', encoding='utf-8') as f:
-                            f.write(result.markdown)
-                        print(f"已保存内容到: {filepath}")
-                        
-                        CrawlerService.update_markdown_registry(result.url, filepath, project_id)
-                        CrawlerService.update_crawled_url_filepath(result.url, filepath, project_id)
-                    
-                    # 发送成功通知
-                    success_message = f"已成功转换URL: {result.url}"
-                    if enable_smart_split:
-                        success_message += f" (智能分段: {split_strategy})"
-                    
-                    SystemService.send_to_websocket({
-                        "task_id": task_id,
-                        "type": "html_to_md_convert_progress",
-                        "status": "processing",
-                        "progress": progress_percent,
-                        "total": total_urls,
-                        "processed": processed_urls,
-                        "successful": successful_urls,  
-                        "message": success_message,
-                        "url": result.url,
-                        "success": True
-                    }, project_id)
-                elif result.status_code == 403 and "robots.txt" in result.error_message:
-                    print(f"跳过 {result.url} - 被robots.txt阻止")
-                    SystemService.send_to_websocket({
-                        "task_id": task_id,
-                        "type": "html_to_md_convert_progress",
-                        "status": "processing",
-                        "progress": progress_percent,
-                        "total": total_urls,
-                        "processed": processed_urls,
-                        "successful": successful_urls,
-                        "message": f"跳过URL: {result.url} - 被robots.txt阻止",
-                        "url": result.url,
-                        "success": False,
-                        "error": "被robots.txt阻止"
-                    }, project_id)
-                elif not result.markdown or not result.markdown.strip():
-                    print(f"跳过 {result.url} - 内容为空")
-                    SystemService.send_to_websocket({
-                        "task_id": task_id,
-                        "type": "html_to_md_convert_progress",
-                        "status": "processing",
-                        "progress": progress_percent,
-                        "total": total_urls,
-                        "processed": processed_urls,
-                        "successful": successful_urls,
-                        "message": f"跳过URL: {result.url} - 内容为空",
-                        "url": result.url,
-                        "success": False,
-                        "error": "内容为空"
-                    }, project_id)
-                else:
-                    print(f"爬取失败 {result.url}: {result.error_message}")
-                    SystemService.send_to_websocket({
-                        "task_id": task_id,
-                        "type": "html_to_md_convert_progress",
-                        "status": "processing",
-                        "progress": progress_percent,
-                        "total": total_urls,
-                        "processed": processed_urls,
-                        "successful": successful_urls,
-                        "message": f"爬取失败: {result.url}",
-                        "url": result.url,
-                        "success": False,
-                        "error": result.error_message
-                    }, project_id)
+                            await send_convert_progress(
+                                notification_service,
+                                processed_urls,
+                                successful_urls,
+                                total_urls,
+                                success_message,
+                                url=result['url'],
+                                success=True
+                            )
+                        elif result.get('status_code') == 403:
+                            print(f"跳过 {result['url']} - 被访问限制阻止")
+                            await send_convert_progress(
+                                notification_service,
+                                processed_urls,
+                                successful_urls,
+                                total_urls,
+                                f"跳过URL: {result['url']} - 被访问限制阻止",
+                                url=result['url'],
+                                success=False,
+                                error="被访问限制阻止"
+                            )
+                        elif not result.get('markdown') or not result.get('markdown', '').strip():
+                            print(f"跳过 {result['url']} - 内容为空")
+                            await send_convert_progress(
+                                notification_service,
+                                processed_urls,
+                                successful_urls,
+                                total_urls,
+                                f"跳过URL: {result['url']} - 内容为空",
+                                url=result['url'],
+                                success=False,
+                                error="内容为空"
+                            )
+                        else:
+                            error_message = result.get('error', 'Unknown error')
+                            print(f"爬取失败 {result['url']}: {error_message}")
+                            await send_convert_progress(
+                                notification_service,
+                                processed_urls,
+                                successful_urls,
+                                total_urls,
+                                f"爬取失败: {result['url']}",
+                                url=result['url'],
+                                success=False,
+                                error=error_message
+                            )
+                
+                # 并发处理所有URL
+                print(f"开始并发处理所有URL...")
+                tasks = [process_single_url(url) for url in urls]
+                results = await asyncio.gather(*tasks, return_exceptions=True)
+                print(f"所有URL处理完成，结果: {len(results)}")
 
-        # 发送完成通知
-        SystemService.send_to_websocket({
-            "task_id": task_id,
-            "type": "html_to_md_convert_progress",
-            "status": "completed",
-            "progress": 100,
-            "total": total_urls,
-            "processed": processed_urls,
-            "successful": successful_urls,
-            "message": f"转换完成，共处理{processed_urls}个URL，成功{successful_urls}个"
-        }, project_id)
+            # 发送完成通知
+            print(f"任务完成，发送完成通知...")
+            await send_convert_complete(
+                notification_service,
+                processed_urls,
+                successful_urls,
+                total_urls
+            )
+            
+            # 更新状态为已完成
+            with open(get_project_output_path(project_id, "convert_status.json"), "w", encoding="utf-8") as f:
+                json.dump({"status": "completed", "message": "转换任务已完成"}, f)
+                
+        except Exception as e:
+            error_msg = str(e)
+            logging.error(f"转换任务失败: {error_msg}")
+            print(f"转换任务失败: {error_msg}")
+            # 记录错误状态
+            with open(get_project_output_path(project_id, "convert_status.json"), "w", encoding="utf-8") as f:
+                json.dump({"status": "failed", "message": f"转换任务失败: {error_msg}"}, f)
+            
+            # 发送失败通知
+            await send_convert_failed(
+                notification_service,
+                processed_urls,
+                successful_urls,
+                total_urls,
+                error_msg
+            )
 
         return urls
 

@@ -18,7 +18,7 @@ async def crawl_links(
     print(f"爬取链接，使用项目ID: {project_id}")
     
     try:
-        result = CrawlerService.start_crawl_process(
+        result = await CrawlerService.start_crawl_task(
             url=str(request.url),
             max_depth=request.max_depth,
             max_pages=request.max_pages,
@@ -76,7 +76,7 @@ async def convert_to_markdown(
     project_id = request.projectId
     urls = [str(url) for url in request.urls]
     try:
-        return CrawlerService.start_convert_process(
+        return await CrawlerService.start_convert_task(
             urls=urls, 
             included_selector=request.included_selector,
             excluded_selector=request.excluded_selector,
