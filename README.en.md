@@ -122,10 +122,13 @@ npm run dev
 │   │   ├── files.py        # Files schema
 │   │   └── dataset.py      # Dataset schema
 │   ├── services/           # Service layer
-│   │   ├── crawler_service.py    # Crawler service
-│   │   ├── system_service.py     # System service
-│   │   ├── files_service.py      # Files service
-│   │   └── dataset_service.py    # Dataset service
+│   │   ├── crawler_service.py        # Crawler service
+│   │   ├── crawler_engine_service.py # Crawler engine service
+│   │   ├── notification_service.py   # Notification service
+│   │   ├── system_service.py         # System service
+│   │   ├── files_service.py          # Files service
+│   │   ├── project_service.py        # Project service
+│   │   └── dataset_service.py        # Dataset service
 │   ├── utils/              # Utility functions
 │   ├── __init__.py         # Initialization file
 │   └── main.py             # Main program entry

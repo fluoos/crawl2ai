@@ -186,7 +186,7 @@ class MarkdownSplitter:
         return merged
     
     def _can_merge_sections(self, section1: Dict, section2: Dict) -> bool:
-        """判断两个段落是否可以合并"""
+        """判断两个段落是否可以合并（改进版：更灵活的合并条件）"""
         stack1 = section1['header_stack']
         stack2 = section2['header_stack']
         
@@ -194,18 +194,26 @@ class MarkdownSplitter:
         if not stack1 and not stack2:
             return True
         
-        # 如果其中一个没有标题，不合并
+        # 如果其中一个没有标题，也可以合并（放宽条件）
         if not stack1 or not stack2:
-            return False
+            return True
         
         # 如果标题层级相同或section2是section1的子章节，可以合并
         if len(stack2) >= len(stack1):
             return stack1 == stack2[:len(stack1)]
         
+        # 如果section1是section2的子章节，也可以合并
+        if len(stack1) > len(stack2):
+            return stack2 == stack1[:len(stack2)]
+        
+        # 如果都是同一个父级下的子章节，也可以合并
+        if len(stack1) == len(stack2) and len(stack1) > 1:
+            return stack1[:-1] == stack2[:-1]
+        
         return False
     
     def _split_large_sections(self, sections: List[Dict]) -> List[Dict]:
-        """分割过大的段落"""
+        """分割过大的段落，简化且可靠的算法"""
         result = []
         
         for section in sections:
@@ -215,41 +223,102 @@ class MarkdownSplitter:
                 result.append(section)
                 continue
             
-            # 按段落强制分割
-            paragraphs = section['content'].split('\n\n')
-            current_chunk = ''
-            current_start = section['start_line']
-            line_offset = 0
+            # 简单但可靠的分割策略：按句子分割
+            content = section['content']
+            sentences = self._split_into_sentences(content)
             
-            for paragraph in paragraphs:
-                paragraph_tokens = self.estimate_tokens(paragraph)
+            current_chunk = ''
+            chunk_counter = 0
+            
+            # 提取标题行（如果有的话）
+            lines = content.split('\n')
+            header_line = ''
+            content_start_idx = 0
+            
+            for i, line in enumerate(lines):
+                if line.strip().startswith('#'):
+                    header_line = line + '\n'
+                    content_start_idx = i + 1
+                    break
+            
+            for sentence in sentences:
+                sentence_tokens = self.estimate_tokens(sentence)
                 current_tokens = self.estimate_tokens(current_chunk)
                 
-                if current_tokens + paragraph_tokens > self.max_tokens and current_chunk:
-                    # 保存当前块
-                    result.append({
-                        'content': current_chunk.strip(),
-                        'header_stack': section['header_stack'].copy(),
-                        'start_line': current_start,
-                        'end_line': current_start + line_offset - 1
-                    })
-                    current_chunk = paragraph + '\n\n'
-                    current_start = current_start + line_offset
-                    line_offset = paragraph.count('\n') + 2
+                # 如果添加这个句子会超出限制，并且当前chunk不为空
+                if (current_tokens + sentence_tokens > self.max_tokens and 
+                    current_chunk.strip()):
+                    
+                    # 保存当前chunk
+                    chunk_content = header_line + current_chunk if chunk_counter == 0 else current_chunk
+                    if chunk_content.strip():
+                        result.append({
+                            'content': chunk_content.strip(),
+                            'header_stack': section['header_stack'].copy(),
+                            'start_line': section['start_line'],
+                            'end_line': section['start_line'] + 10  # 简化行号处理
+                        })
+                    
+                    # 开始新chunk
+                    current_chunk = sentence
+                    chunk_counter += 1
                 else:
-                    current_chunk += paragraph + '\n\n'
-                    line_offset += paragraph.count('\n') + 2
+                    current_chunk += sentence
             
-            # 添加最后一块
+            # 添加最后一个chunk
             if current_chunk.strip():
+                chunk_content = header_line + current_chunk if chunk_counter == 0 else current_chunk
                 result.append({
-                    'content': current_chunk.strip(),
+                    'content': chunk_content.strip(),
                     'header_stack': section['header_stack'].copy(),
-                    'start_line': current_start,
+                    'start_line': section['start_line'],
                     'end_line': section['end_line']
                 })
         
         return result
+    
+    def _split_into_sentences(self, text: str) -> List[str]:
+        """将文本分割为句子"""
+        # 简单的句子分割，基于标点符号和换行
+        import re
+        
+        # 先按双换行分割段落
+        paragraphs = text.split('\n\n')
+        sentences = []
+        
+        for paragraph in paragraphs:
+            if not paragraph.strip():
+                continue
+                
+            # 对于每个段落，按句号、问号、感叹号分割
+            para_sentences = re.split(r'[。！？.!?]\s*', paragraph)
+            
+            for i, sentence in enumerate(para_sentences):
+                if sentence.strip():
+                    # 恢复标点符号（除了最后一个）
+                    if i < len(para_sentences) - 1:
+                        # 查找原始标点
+                        next_start = paragraph.find(sentence) + len(sentence)
+                        if next_start < len(paragraph):
+                            punctuation = paragraph[next_start:next_start+1]
+                            if punctuation in '。！？.!?':
+                                sentence += punctuation
+                    
+                    sentences.append(sentence + '\n')
+            
+            # 添加段落分隔
+            if sentences:
+                sentences.append('\n')
+        
+        return sentences
+    
+    def _find_last_header(self, lines: List[str]) -> Optional[str]:
+        """在行列表中找到最后一个标题行"""
+        for line in reversed(lines):
+            is_header, _, _ = self._is_header_line(line)
+            if is_header:
+                return line
+        return None
     
     def _build_header_path(self, header_stack: List[Tuple[int, str]]) -> str:
         """构建标题路径"""
@@ -297,7 +366,13 @@ class MarkdownSplitter:
         # 3. 分割过大段落
         sections = self._split_large_sections(sections)
         
-        # 4. 构建MarkdownChunk对象
+        # 4. 后处理：再次合并仍然过小的段落
+        sections = self._post_process_small_sections(sections)
+        
+        # 5. 最终安全网：确保没有过小分段
+        sections = self._final_cleanup(sections)
+        
+        # 6. 构建MarkdownChunk对象
         chunks = []
         for i, section in enumerate(sections):
             # 从内容中提取实际的标题
@@ -319,6 +394,133 @@ class MarkdownSplitter:
             chunks.append(chunk)
         
         return chunks
+    
+    def _post_process_small_sections(self, sections: List[Dict]) -> List[Dict]:
+        """后处理：多轮强力合并过小段落"""
+        if not sections:
+            return []
+        
+        result = sections[:]
+        max_iterations = 5  # 最多处理5轮
+        
+        for iteration in range(max_iterations):
+            # 检查是否还有过小的段落
+            has_small_sections = any(
+                self.estimate_tokens(section['content']) < self.min_tokens 
+                for section in result
+            )
+            
+            if not has_small_sections:
+                break  # 没有过小段落，退出循环
+            
+            # 执行一轮合并
+            result = self._merge_round(result, iteration)
+        
+        return result
+    
+    def _merge_round(self, sections: List[Dict], round_num: int) -> List[Dict]:
+        """执行一轮合并，每轮的策略越来越激进"""
+        if not sections:
+            return []
+        
+        merged = []
+        i = 0
+        
+        while i < len(sections):
+            current = sections[i]
+            current_tokens = self.estimate_tokens(current['content'])
+            
+            # 如果当前段落过小，尝试合并
+            if current_tokens < self.min_tokens:
+                merged_successfully = False
+                
+                # 策略1：向前合并（与前一个段落合并）
+                if merged and not merged_successfully:
+                    last_tokens = self.estimate_tokens(merged[-1]['content'])
+                    if last_tokens + current_tokens <= self.max_tokens:
+                        # 执行向前合并
+                        merged[-1]['content'] += '\n\n' + current['content']
+                        merged[-1]['end_line'] = current['end_line']
+                        if (current['header_stack'] and 
+                            len(current['header_stack']) > len(merged[-1]['header_stack'])):
+                            merged[-1]['header_stack'] = current['header_stack']
+                        merged_successfully = True
+                
+                # 策略2：向后合并（与后一个段落合并）
+                if not merged_successfully and i + 1 < len(sections):
+                    next_section = sections[i + 1]
+                    next_tokens = self.estimate_tokens(next_section['content'])
+                    if current_tokens + next_tokens <= self.max_tokens:
+                        # 执行向后合并
+                        merged_content = current['content'] + '\n\n' + next_section['content']
+                        merged_section = {
+                            'content': merged_content,
+                            'header_stack': current['header_stack'] if current['header_stack'] else next_section['header_stack'],
+                            'start_line': current['start_line'],
+                            'end_line': next_section['end_line']
+                        }
+                        merged.append(merged_section)
+                        i += 2  # 跳过下一个段落
+                        merged_successfully = True
+                
+                # 策略3：激进合并（第2轮及以后）
+                if not merged_successfully and round_num >= 1:
+                    # 更激进的合并策略
+                    if merged:
+                        # 强制与前一个合并，即使会稍微超限
+                        last_tokens = self.estimate_tokens(merged[-1]['content'])
+                        if last_tokens + current_tokens <= self.max_tokens * 1.2:  # 允许超限20%
+                            merged[-1]['content'] += '\n\n' + current['content']
+                            merged[-1]['end_line'] = current['end_line']
+                            merged_successfully = True
+                    elif i + 1 < len(sections):
+                        # 强制与后一个合并
+                        next_section = sections[i + 1]
+                        merged_content = current['content'] + '\n\n' + next_section['content']
+                        merged_section = {
+                            'content': merged_content,
+                            'header_stack': current['header_stack'] if current['header_stack'] else next_section['header_stack'],
+                            'start_line': current['start_line'],
+                            'end_line': next_section['end_line']
+                        }
+                        merged.append(merged_section)
+                        i += 2
+                        merged_successfully = True
+                
+                # 如果所有策略都失败，保留原段落（但这种情况应该很少）
+                if not merged_successfully:
+                    merged.append(current)
+                    i += 1
+            else:
+                # 当前段落正常，直接添加
+                merged.append(current)
+                i += 1
+        
+        return merged
+    
+    def _final_cleanup(self, sections: List[Dict]) -> List[Dict]:
+        """最终清理：强制处理所有过小分段"""
+        if not sections:
+            return []
+        
+        result = []
+        
+        for section in sections:
+            tokens = self.estimate_tokens(section['content'])
+            
+            if tokens < self.min_tokens:
+                # 过小段落的最终处理策略
+                if result:
+                    # 强制合并到前一个段落，不管是否超限
+                    result[-1]['content'] += '\n\n' + section['content']
+                    result[-1]['end_line'] = section['end_line']
+                else:
+                    # 如果是第一个段落且过小，保留它（总比丢失内容好）
+                    result.append(section)
+            else:
+                result.append(section)
+        
+        return result
     
     def get_split_summary(self, chunks: List[MarkdownChunk]) -> Dict[str, Any]:
         """获取分段摘要信息"""

@@ -1,7 +1,13 @@
-crawl4ai==0.5.0.post4
+# 核心网络和解析库
+aiohttp>=3.8.0
 beautifulsoup4==4.12.2
 requests==2.31.0
 markdownify==0.11.6
+
+# 原始爬虫库（可选，已被轻量级方案替代）
+# crawl4ai==0.5.0.post4
+
+# 其他工具
 python-slugify==8.0.1
 openai>=1.0.0
 python-dotenv>=0.19.0

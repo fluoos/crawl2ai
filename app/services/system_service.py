@@ -460,16 +460,43 @@ class SystemService:
         SystemService._write_json_file(SystemService.FILE_STRATEGY_CONFIG_FILE, default_strategy)
         return {"status": "success", "message": "文件策略配置已重置"}
 
-    # 将模块级函数改为静态方法
+    # 将模块级函数改为静态方法，直接调用WebSocket manager
     @staticmethod
     def send_to_websocket(data, project_id):
         try:
-            response = requests.post(
-                "http://127.0.0.1:8000/api/system/internal/send-ws-message",
-                json=data,
-                params={"project_id": project_id}
-            )
-            return response.status_code == 200
+            from app.core.websocket import manager
+            import asyncio
+            print(f"直接发送WebSocket消息到项目 {project_id}")
+            
+            # 如果在异步上下文中，直接调用异步方法
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    # 在异步上下文中，创建一个任务
+                    asyncio.create_task(manager.send_json(data, project_id))
+                else:
+                    # 在同步上下文中，运行异步方法
+                    loop.run_until_complete(manager.send_json(data, project_id))
+            except RuntimeError:
+                # 没有事件循环，创建新的
+                asyncio.run(manager.send_json(data, project_id))
+            
+            print(f"WebSocket消息发送成功")
+            return True
         except Exception as e:
             print(f"发送WebSocket消息失败: {str(e)}")
+            return False
+
+    # 异步版本的WebSocket发送方法
+    @staticmethod
+    async def send_to_websocket_async(data, project_id):
+        """异步发送WebSocket消息，直接调用manager"""
+        try:
+            from app.core.websocket import manager
+            print(f"异步直接发送WebSocket消息到项目 {project_id}")
+            await manager.send_json(data, project_id)
+            print(f"异步WebSocket消息发送成功")
+            return True
+        except Exception as e:
+            print(f"异步发送WebSocket消息失败: {str(e)}")
             return False
