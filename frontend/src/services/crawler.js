@@ -74,4 +74,15 @@ export async function convertToMarkdown(data) {
     console.error('转换为Markdown失败:', error);
     throw error;
   }
-} 
+}
+
+/**
+ * 导出所有链接到Excel文件
+ * @returns {Promise<Object>}
+ */
+export const exportLinksToExcel = () => {
+  return request({
+    url: '/api/crawler/export-excel',
+    method: 'post'
+  });
+}; 

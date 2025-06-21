@@ -42,4 +42,10 @@ class UrlToMarkdownResponse(BaseModel):
     status: str
     message: str
     files: Optional[List[str]] = None
-    count: Optional[int] = None 
+    count: Optional[int] = None
+
+class ExportLinksResponse(BaseModel):
+    status: str
+    message: str
+    file_path: Optional[str] = None
+    download_url: Optional[str] = None 

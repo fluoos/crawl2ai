@@ -17,3 +17,7 @@ werkzeug==2.0.1
 chardet==4.0.0
 markitdown[all]
 onnxruntime==1.21.0
+
+# Excel导出支持
+openpyxl>=3.0.0
+pandas>=1.5.0
