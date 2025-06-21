@@ -408,8 +408,8 @@ const confirmConvert = async () => {
 
     const response = await convertToDataset(
       requestData.files,
-      requestData.outputFile,
-      requestData
+      "default",  // model参数
+      requestData.outputFile
     );
     
     if (response && response.status === 'success') {

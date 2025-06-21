@@ -122,10 +122,13 @@ npm run dev
 │   │   ├── files.py        # 文件模式
 │   │   └── dataset.py      # 数据集模式
 │   ├── services/           # 服务层
-│   │   ├── crawler_service.py    # 爬虫服务
-│   │   ├── system_service.py     # 系统服务
-│   │   ├── files_service.py      # 文件服务
-│   │   └── dataset_service.py    # 数据集服务
+│   │   ├── crawler_service.py        # 爬虫服务
+│   │   ├── crawler_engine_service.py # 爬虫引擎服务
+│   │   ├── notification_service.py   # 通知服务
+│   │   ├── system_service.py         # 系统服务
+│   │   ├── files_service.py          # 文件服务
+│   │   ├── project_service.py        # 项目服务
+│   │   └── dataset_service.py        # 数据集服务
 │   ├── utils/              # 工具函数
 │   ├── __init__.py         # 初始化文件
 │   └── main.py             # 主程序入口

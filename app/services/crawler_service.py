@@ -13,6 +13,12 @@ import uuid
 import re
 from app.core.config import settings
 from app.services.system_service import SystemService
+from app.services.notification_service import (
+    send_convert_start,
+    send_convert_progress,
+    send_convert_complete,
+    send_convert_failed
+)
 from app.utils.path_utils import (
     join_paths, 
     get_output_path,
@@ -610,27 +616,10 @@ class CrawlerService:
         total_urls = len(urls)
         processed_urls = 0
         successful_urls = 0
-        # 生成任务通知的唯一ID，使用uuid
-        task_id = str(uuid.uuid4())
         
-        print(f"任务ID: {task_id}, 开始发送WebSocket通知")
-        
-        # 发送初始进度更新（使用异步方法）
-        try:
-            await SystemService.send_to_websocket_async({
-                "task_id": task_id,
-                "type": "html_to_md_convert_progress",
-                "status": "started",
-                "progress": 0,
-                "total": total_urls,
-                "processed": 0,
-                "successful": 0,
-                "message": "开始转换URL为Markdown"
-            }, project_id)
-            print("异步WebSocket通知发送成功")
-        except Exception as e:
-            print(f"异步WebSocket通知发送失败: {e}")
-            # 继续执行，不因为通知失败而中断
+        # 使用新的通知系统
+        notification_service = await send_convert_start(project_id, total_urls)
+        print(f"通知服务初始化成功，任务ID: {notification_service.get_task_id()}")
 
         try:
             print("开始创建aiohttp ClientSession...")
@@ -650,7 +639,6 @@ class CrawlerService:
                     
                     async with semaphore:
                         processed_urls += 1
-                        progress_percent = int(processed_urls / total_urls * 100)
                         
                         print(f"[{processed_urls}/{total_urls}] 开始转换链接: {url}")
                         
@@ -767,76 +755,52 @@ class CrawlerService:
                             if enable_smart_split:
                                 success_message += f" (智能分段: {split_strategy})"
                             
-                            try:
-                                SystemService.send_to_websocket({
-                                    "task_id": task_id,
-                                    "type": "html_to_md_convert_progress",
-                                    "status": "processing",
-                                    "progress": progress_percent,
-                                    "total": total_urls,
-                                    "processed": processed_urls,
-                                    "successful": successful_urls,  
-                                    "message": success_message,
-                                    "url": result['url'],
-                                    "success": True
-                                }, project_id)
-                            except Exception as e:
-                                print(f"发送成功通知失败: {e}")
+                            await send_convert_progress(
+                                notification_service,
+                                processed_urls,
+                                successful_urls,
+                                total_urls,
+                                success_message,
+                                url=result['url'],
+                                success=True
+                            )
                         elif result.get('status_code') == 403:
                             print(f"跳过 {result['url']} - 被访问限制阻止")
-                            try:
-                                SystemService.send_to_websocket({
-                                    "task_id": task_id,
-                                    "type": "html_to_md_convert_progress",
-                                    "status": "processing",
-                                    "progress": progress_percent,
-                                    "total": total_urls,
-                                    "processed": processed_urls,
-                                    "successful": successful_urls,
-                                    "message": f"跳过URL: {result['url']} - 被访问限制阻止",
-                                    "url": result['url'],
-                                    "success": False,
-                                    "error": "被访问限制阻止"
-                                }, project_id)
-                            except Exception as e:
-                                print(f"发送403通知失败: {e}")
+                            await send_convert_progress(
+                                notification_service,
+                                processed_urls,
+                                successful_urls,
+                                total_urls,
+                                f"跳过URL: {result['url']} - 被访问限制阻止",
+                                url=result['url'],
+                                success=False,
+                                error="被访问限制阻止"
+                            )
                         elif not result.get('markdown') or not result.get('markdown', '').strip():
                             print(f"跳过 {result['url']} - 内容为空")
-                            try:
-                                SystemService.send_to_websocket({
-                                    "task_id": task_id,
-                                    "type": "html_to_md_convert_progress",
-                                    "status": "processing",
-                                    "progress": progress_percent,
-                                    "total": total_urls,
-                                    "processed": processed_urls,
-                                    "successful": successful_urls,
-                                    "message": f"跳过URL: {result['url']} - 内容为空",
-                                    "url": result['url'],
-                                    "success": False,
-                                    "error": "内容为空"
-                                }, project_id)
-                            except Exception as e:
-                                print(f"发送内容为空通知失败: {e}")
+                            await send_convert_progress(
+                                notification_service,
+                                processed_urls,
+                                successful_urls,
+                                total_urls,
+                                f"跳过URL: {result['url']} - 内容为空",
+                                url=result['url'],
+                                success=False,
+                                error="内容为空"
+                            )
                         else:
                             error_message = result.get('error', 'Unknown error')
                             print(f"爬取失败 {result['url']}: {error_message}")
-                            try:
-                                SystemService.send_to_websocket({
-                                    "task_id": task_id,
-                                    "type": "html_to_md_convert_progress",
-                                    "status": "processing",
-                                    "progress": progress_percent,
-                                    "total": total_urls,
-                                    "processed": processed_urls,
-                                    "successful": successful_urls,
-                                    "message": f"爬取失败: {result['url']}",
-                                    "url": result['url'],
-                                    "success": False,
-                                    "error": error_message
-                                }, project_id)
-                            except Exception as e:
-                                print(f"发送失败通知失败: {e}")
+                            await send_convert_progress(
+                                notification_service,
+                                processed_urls,
+                                successful_urls,
+                                total_urls,
+                                f"爬取失败: {result['url']}",
+                                url=result['url'],
+                                success=False,
+                                error=error_message
+                            )
                 
                 # 并发处理所有URL
                 print(f"开始并发处理所有URL...")
@@ -846,20 +810,12 @@ class CrawlerService:
 
             # 发送完成通知
             print(f"任务完成，发送完成通知...")
-            try:
-                SystemService.send_to_websocket({
-                    "task_id": task_id,
-                    "type": "html_to_md_convert_progress", 
-                    "status": "completed",
-                    "progress": 100,
-                    "total": total_urls,
-                    "processed": processed_urls,
-                    "successful": successful_urls,
-                    "message": f"转换完成，共处理{processed_urls}个URL，成功{successful_urls}个"
-                }, project_id)
-                print("完成通知发送成功")
-            except Exception as e:
-                print(f"发送完成通知失败: {e}")
+            await send_convert_complete(
+                notification_service,
+                processed_urls,
+                successful_urls,
+                total_urls
+            )
             
             # 更新状态为已完成
             with open(get_project_output_path(project_id, "convert_status.json"), "w", encoding="utf-8") as f:
@@ -874,19 +830,13 @@ class CrawlerService:
                 json.dump({"status": "failed", "message": f"转换任务失败: {error_msg}"}, f)
             
             # 发送失败通知
-            try:
-                SystemService.send_to_websocket({
-                    "task_id": task_id,
-                    "type": "html_to_md_convert_progress", 
-                    "status": "failed",
-                    "progress": int(processed_urls / total_urls * 100) if total_urls > 0 else 0,
-                    "total": total_urls,
-                    "processed": processed_urls,
-                    "successful": successful_urls,
-                    "message": f"转换任务失败: {error_msg}"
-                }, project_id)
-            except Exception as e:
-                print(f"发送失败通知失败: {e}")
+            await send_convert_failed(
+                notification_service,
+                processed_urls,
+                successful_urls,
+                total_urls,
+                error_msg
+            )
 
         return urls
 
