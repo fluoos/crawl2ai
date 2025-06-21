@@ -106,6 +106,9 @@
           <a-button @click="fetchCrawlStatus">
             <ReloadOutlined /> 刷新状态
           </a-button>
+          <a-button @click="handleExportExcel" :loading="exportLoading">
+            <DownloadOutlined /> 导出Excel
+          </a-button>
           <a-button
             type="primary"
             :disabled="!selectedUrls.length"
@@ -261,10 +264,11 @@
 <script setup>
 import { ref, reactive, onMounted, onUnmounted } from 'vue';
 import { message, Modal } from 'ant-design-vue';
-import { ReloadOutlined  } from '@ant-design/icons-vue';
-import { crawlLinks, getCrawlStatus, convertToMarkdown, stopCrawl, deleteUrls } from '../services/crawler';
+import { ReloadOutlined, DownloadOutlined } from '@ant-design/icons-vue';
+import { crawlLinks, getCrawlStatus, convertToMarkdown, stopCrawl, deleteUrls, exportLinksToExcel } from '../services/crawler';
 import { getFileStrategy } from '../services/system';
 import wsService from '../services/websocket';
+import { getFullApiUrl } from '../utils/url';
 
 // 表单状态
 const formState = reactive({
@@ -298,6 +302,7 @@ const crawlStatus = ref('');
 const crawlStatusType = ref('info');
 const tableLoading = ref(false);
 const convertLoading = ref(false);
+const exportLoading = ref(false);
 
 // 表格数据
 const urlList = ref([]);
@@ -593,6 +598,35 @@ const handleConvertConfirm = async () => {
     message.error('转换失败');
   } finally {
     convertLoading.value = false;
+  }
+};
+
+// 导出Excel
+const handleExportExcel = async () => {
+  exportLoading.value = true;
+  try {
+    const response = await exportLinksToExcel();
+    
+    if (response.status === 'success') {
+      message.success(response.message);
+      
+      // 如果有下载链接，自动下载文件
+      if (response.download_url) {
+        const link = document.createElement('a');
+        link.href = getFullApiUrl(response.download_url);
+        link.download = '';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+    } else {
+      message.error(response.message || '导出Excel失败');
+    }
+  } catch (error) {
+    console.error('导出Excel失败:', error);
+    message.error('导出Excel失败');
+  } finally {
+    exportLoading.value = false;
   }
 };
 </script>

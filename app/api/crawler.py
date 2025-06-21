@@ -1,7 +1,8 @@
 from fastapi import APIRouter, HTTPException, Depends
+from fastapi.responses import FileResponse, JSONResponse
 from typing import List, Optional
 
-from app.schemas.crawler import CrawlerRequest, CrawlerResponse, UrlToMarkdownRequest, UrlToMarkdownResponse
+from app.schemas.crawler import CrawlerRequest, CrawlerResponse, UrlToMarkdownRequest, UrlToMarkdownResponse, ExportLinksResponse
 from app.core.deps import get_api_key, get_project_id
 from app.services.crawler_service import CrawlerService
 from app.core.config import settings
@@ -88,3 +89,35 @@ async def convert_to_markdown(
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"转换任务创建失败: {str(e)}")
+
+@router.post("/export-excel", response_model=ExportLinksResponse)
+async def export_links_excel(
+    api_key: str = Depends(get_api_key),
+    project_id: Optional[str] = Depends(get_project_id)
+):
+    """导出所有链接到Excel文件"""
+    try:
+        result = CrawlerService.export_links_to_excel(project_id=project_id)
+        return ExportLinksResponse(**result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"导出Excel失败: {str(e)}")
+
+@router.get("/download")
+async def download_file(
+    filename: str,
+    api_key: str = Depends(get_api_key),
+    project_id: Optional[str] = Depends(get_project_id)
+):
+    """下载导出的文件"""
+    try:
+        file_path = CrawlerService.get_download_file_path(filename, project_id)
+        return FileResponse(
+            path=file_path,
+            filename=filename,
+            media_type="application/octet-stream",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

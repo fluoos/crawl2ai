@@ -1003,3 +1003,157 @@ class CrawlerService:
             print(f"更新分段文件注册表时出错: {str(e)}")
             logging.error(f"更新分段文件注册表时出错: {str(e)}")
             return False
+
+    @staticmethod
+    def export_links_to_excel(project_id: Optional[str] = None) -> Dict[str, Any]:
+        """
+        导出所有链接到Excel文件
+        
+        Args:
+            project_id: 项目ID
+        
+        Returns:
+            Dict[str, Any]: 包含状态、消息和文件路径的响应
+        """
+        try:
+            # 读取已爬取的链接数据
+            crawled_urls_path = get_project_output_path(project_id, "crawled_urls.json")
+            
+            if not os.path.exists(crawled_urls_path):
+                return {
+                    "status": "error",
+                    "message": "没有找到已爬取的链接数据",
+                    "file_path": None,
+                    "download_url": None
+                }
+            
+            # 读取链接数据
+            with open(crawled_urls_path, 'r', encoding='utf-8') as f:
+                all_links = json.load(f)
+            
+            if not all_links:
+                return {
+                    "status": "warning",
+                    "message": "没有找到链接数据",
+                    "file_path": None,
+                    "download_url": None
+                }
+            
+            # 确保导出目录存在
+            export_dir = get_project_output_path(project_id, "exports")
+            ensure_dir(export_dir)
+            
+            # 生成带时间戳的文件名
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"links_export_{timestamp}.xlsx"
+            filepath = join_paths(export_dir, filename)
+            
+            # 导出到Excel
+            CrawlerService._export_to_excel(all_links, filepath)
+            
+            download_url = f"/api/crawler/download?filename={filename}&projectId={project_id}"
+            
+            return {
+                "status": "success",
+                "message": f"成功导出 {len(all_links)} 个链接到Excel文件",
+                "file_path": filepath,
+                "download_url": download_url
+            }
+            
+        except Exception as e:
+            logging.error(f"导出链接到Excel失败: {str(e)}")
+            return {
+                "status": "error",
+                "message": f"导出链接到Excel失败: {str(e)}",
+                "file_path": None,
+                "download_url": None
+            }
+
+    @staticmethod
+    def _export_to_excel(links: List[Dict], filepath: str):
+        """导出为Excel格式"""
+        try:
+            import openpyxl
+            from openpyxl.styles import Font, PatternFill
+        except ImportError:
+            # 如果没有openpyxl，使用pandas和xlsxwriter
+            import pandas as pd
+            
+            # 转换数据格式
+            data_for_df = []
+            for link in links:
+                if isinstance(link, dict):
+                    data_for_df.append(link)
+                else:
+                    data_for_df.append({'url': str(link)})
+            
+            # 创建DataFrame并导出
+            df = pd.DataFrame(data_for_df)
+            df.to_excel(filepath, index=False, engine='openpyxl')
+            return
+        
+        # 使用openpyxl创建工作簿
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "链接列表"
+        
+        # 设置标题行
+        headers = ['序号', 'URL', '标题', '深度', '得分', '爬取时间']
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.font = Font(bold=True)
+            cell.fill = PatternFill(start_color="CCCCCC", end_color="CCCCCC", fill_type="solid")
+        
+        # 填充数据
+        for row, link in enumerate(links, 2):
+            if isinstance(link, dict):
+                ws.cell(row=row, column=1, value=link.get('id', row-1))
+                ws.cell(row=row, column=2, value=link.get('url', ''))
+                ws.cell(row=row, column=3, value=link.get('title', ''))
+                ws.cell(row=row, column=4, value=link.get('depth', ''))
+                ws.cell(row=row, column=5, value=link.get('score', ''))
+                ws.cell(row=row, column=6, value=link.get('crawled_at', ''))
+            else:
+                ws.cell(row=row, column=1, value=row-1)
+                ws.cell(row=row, column=2, value=str(link))
+        
+        # 调整列宽
+        ws.column_dimensions['A'].width = 8
+        ws.column_dimensions['B'].width = 60
+        ws.column_dimensions['C'].width = 40
+        ws.column_dimensions['D'].width = 8
+        ws.column_dimensions['E'].width = 8
+        ws.column_dimensions['F'].width = 20
+        
+        # 保存文件
+        wb.save(filepath)
+
+    @staticmethod
+    def get_download_file_path(filename: str, project_id: Optional[str] = None) -> str:
+        """获取下载文件的路径"""
+        # 根据项目ID选择正确的导出目录
+        style_dir = CrawlerService.get_project_export_path(project_id)
+        file_path = os.path.join(style_dir, filename)
+        
+        if not os.path.exists(file_path):
+            raise ValueError("文件不存在")
+        return file_path
+
+    @staticmethod
+    def get_project_export_path(project_id: Optional[str] = None) -> str:
+        """
+        获取项目导出目录路径
+        如果提供了项目ID，则返回项目下的导出目录
+        否则返回默认导出目录
+        """
+        if project_id:
+            # 项目导出目录 - 修改路径结构
+            project_export_dir = os.path.join(settings.OUTPUT_DIR, str(project_id), "exports")
+            # 确保目录存在
+            os.makedirs(project_export_dir, exist_ok=True)
+            return project_export_dir
+        else:
+            # 返回默认导出目录
+            export_dir = os.path.join(settings.EXPORT_DIR)
+            os.makedirs(export_dir, exist_ok=True)
+            return export_dir
