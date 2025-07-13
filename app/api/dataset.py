@@ -1,12 +1,9 @@
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Query
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse
 import os
 from typing import Dict, Any, List, Optional
 
 import os
-import json
-import aiohttp
-import asyncio
 import logging
 from app.core.config import settings
 from app.core.deps import get_api_key, get_project_id
