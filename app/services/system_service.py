@@ -6,6 +6,7 @@ from typing import Dict, Any, List
 import requests
 from app.core.config import settings
 from app.utils.path_utils import join_paths, get_config_path
+from app.utils import FileUtils, JsonUtils
 
 class SystemService:
     """系统服务类，处理所有与系统配置相关的业务逻辑"""
@@ -19,29 +20,14 @@ class SystemService:
         """读取JSON文件，如果文件不存在则返回默认值"""
         file_path = get_config_path(filename)
         print(f"尝试读取文件: {file_path}")
-        try:
-            if os.path.exists(file_path):
-                with open(file_path, "r", encoding="utf-8") as f:
-                    return json.load(f)
-            else:
-                print(f"文件不存在，返回默认值: {default_value}")
-                return default_value
-        except Exception as e:
-            print(f"读取文件 {file_path} 时出错: {str(e)}")
-            return default_value
+        return FileUtils.read_json(file_path, default_value)
     
     @staticmethod
     def _write_json_file(filename, data):
         """写入JSON文件"""
-        try:
-            file_path = get_config_path(filename)
-            print(f"尝试写入文件: {file_path}")
-            with open(file_path, "w", encoding="utf-8") as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
-            print(f"文件 {file_path} 写入成功")
-        except Exception as e:
-            print(f"写入文件 {file_path} 时出错: {str(e)}")
-            raise e
+        file_path = get_config_path(filename)
+        print(f"尝试写入文件: {file_path}")
+        return FileUtils.write_json(file_path, data)
     
     @staticmethod
     def get_default_models():

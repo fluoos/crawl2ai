@@ -1,31 +1,27 @@
 import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
-import path from 'path';
+import { resolve } from 'path';
 
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [vue()],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
-      'components': path.resolve(__dirname, './src/components'),
-      'views': path.resolve(__dirname, './src/views'),
-      'assets': path.resolve(__dirname, './src/assets'),
-      'services': path.resolve(__dirname, './src/services'),
-      'stores': path.resolve(__dirname, './src/stores'),
-      'utils': path.resolve(__dirname, './src/utils'),
-    },
+      '@': resolve(__dirname, 'src')
+    }
   },
   server: {
     port: 3000,
-    open: true,
     proxy: {
       '/api': {
         target: 'http://localhost:8000',
-        changeOrigin: true,
-        ws: true  // 这行很重要！
+        changeOrigin: true
       },
-    },
+      '/ws': {
+        target: 'ws://localhost:8000',
+        ws: true
+      }
+    }
   },
   build: {
     outDir: 'dist',

@@ -54,7 +54,7 @@
       >
         <template #body-filename="{ record }">
           <a-tooltip :title="record.filename">
-            <a @click="previewFile(record)">{{ record.filename }}</a>
+            <a @click="handlePreviewFile(record)">{{ record.filename }}</a>
           </a-tooltip>
         </template>
         <template #body-size="{ record }">
@@ -74,7 +74,7 @@
         </template>
         <template #body-action="{ record }">
           <a-space>
-            <a-button type="link" size="small" @click="previewFile(record)">
+            <a-button type="link" size="small" @click="handlePreviewFile(record)">
               预览
             </a-button>
             <a-button type="link" size="small" @click="handleSingleConvert(record)">
@@ -103,17 +103,11 @@
     </a-modal>
     
     <!-- 文件预览对话框 -->
-    <a-modal
-      v-model:visible="previewModalVisible"
-      title="文件预览"
-      width="800px"
-      :footer="null"
-    >
-      <div class="file-preview">
-        <pre v-if="previewContent">{{ previewContent }}</pre>
-        <a-empty v-else description="文件内容为空" />
-      </div>
-    </a-modal>
+    <FilePreviewModal
+      v-model="previewModalVisible"
+      :content="previewContent"
+      :file-name="previewFile?.filename"
+    />
     
     <!-- 智能分段配置弹窗 -->
     <a-modal
@@ -214,6 +208,7 @@ import { message, Modal } from 'ant-design-vue';
 import { ReloadOutlined, SettingOutlined } from '@ant-design/icons-vue';
 import DataTable from '../components/common/DataTable.vue';
 import FileUploader from '../components/common/FileUploader.vue';
+import FilePreviewModal from '../components/common/FilePreviewModal.vue';
 import { getFileList, convertToDataset, getFilePreview, deleteFiles } from '../services/files';
 import { getFileStrategy, updateFileStrategy } from '../services/system';
 import wsService from '../services/websocket';
@@ -237,6 +232,7 @@ const selectedFiles = ref([]);
 // 预览相关
 const previewModalVisible = ref(false);
 const previewContent = ref('');
+const previewFile = ref(null); // 新增：用于存储当前预览文件的完整记录
 
 // 转换相关
 const convertModalVisible = ref(false);
@@ -352,7 +348,8 @@ const handleTableChange = (pag) => {
 };
 
 // 预览文件
-const previewFile = async (record) => {
+const handlePreviewFile = async (record) => {
+  previewFile.value = record; // 更新预览文件记录
   try {
     // 真实环境应该通过API获取文件内容
     const response = await getFilePreview(record.path);
@@ -538,14 +535,7 @@ const formatFileSize = (bytes) => {
   text-decoration: underline;
 }
 
-.file-preview {
-  max-height: 500px;
-  overflow-y: auto;
-  background: #f5f5f5;
-  padding: 12px;
-  border-radius: 4px;
-  font-family: monospace;
-}
+/* 移除原有的file-preview样式，因为已经移到组件中了 */
 
 .smart-split-label {
   font-size: 13px;

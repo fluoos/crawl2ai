@@ -448,6 +448,7 @@ class DatasetService:
                     ],
                     stream=False
                 )
+                print(f"response ok: {file_path}")
                 generated_text = response.choices[0].message.content
                 finish_reason = response.choices[0].finish_reason
                 print(f"获取到大模型的第 {i + 1} 个文件结果，长度为: {len(generated_text)}")
