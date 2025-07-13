@@ -54,7 +54,7 @@
       >
         <template #body-filename="{ record }">
           <a-tooltip :title="record.filename">
-            <a @click="previewFile(record)">{{ record.filename }}</a>
+            <a @click="handlePreviewFile(record)">{{ record.filename }}</a>
           </a-tooltip>
         </template>
         <template #body-size="{ record }">
@@ -74,7 +74,7 @@
         </template>
         <template #body-action="{ record }">
           <a-space>
-            <a-button type="link" size="small" @click="previewFile(record)">
+            <a-button type="link" size="small" @click="handlePreviewFile(record)">
               预览
             </a-button>
             <a-button type="link" size="small" @click="handleSingleConvert(record)">
@@ -106,6 +106,7 @@
     <FilePreviewModal
       v-model="previewModalVisible"
       :content="previewContent"
+      :file-name="previewFile?.filename"
     />
     
     <!-- 智能分段配置弹窗 -->
@@ -231,6 +232,7 @@ const selectedFiles = ref([]);
 // 预览相关
 const previewModalVisible = ref(false);
 const previewContent = ref('');
+const previewFile = ref(null); // 新增：用于存储当前预览文件的完整记录
 
 // 转换相关
 const convertModalVisible = ref(false);
@@ -346,7 +348,8 @@ const handleTableChange = (pag) => {
 };
 
 // 预览文件
-const previewFile = async (record) => {
+const handlePreviewFile = async (record) => {
+  previewFile.value = record; // 更新预览文件记录
   try {
     // 真实环境应该通过API获取文件内容
     const response = await getFilePreview(record.path);
