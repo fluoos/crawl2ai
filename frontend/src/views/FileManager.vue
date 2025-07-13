@@ -103,17 +103,10 @@
     </a-modal>
     
     <!-- 文件预览对话框 -->
-    <a-modal
-      v-model:visible="previewModalVisible"
-      title="文件预览"
-      width="800px"
-      :footer="null"
-    >
-      <div class="file-preview">
-        <pre v-if="previewContent">{{ previewContent }}</pre>
-        <a-empty v-else description="文件内容为空" />
-      </div>
-    </a-modal>
+    <FilePreviewModal
+      v-model="previewModalVisible"
+      :content="previewContent"
+    />
     
     <!-- 智能分段配置弹窗 -->
     <a-modal
@@ -214,6 +207,7 @@ import { message, Modal } from 'ant-design-vue';
 import { ReloadOutlined, SettingOutlined } from '@ant-design/icons-vue';
 import DataTable from '../components/common/DataTable.vue';
 import FileUploader from '../components/common/FileUploader.vue';
+import FilePreviewModal from '../components/common/FilePreviewModal.vue';
 import { getFileList, convertToDataset, getFilePreview, deleteFiles } from '../services/files';
 import { getFileStrategy, updateFileStrategy } from '../services/system';
 import wsService from '../services/websocket';
@@ -538,14 +532,7 @@ const formatFileSize = (bytes) => {
   text-decoration: underline;
 }
 
-.file-preview {
-  max-height: 500px;
-  overflow-y: auto;
-  background: #f5f5f5;
-  padding: 12px;
-  border-radius: 4px;
-  font-family: monospace;
-}
+/* 移除原有的file-preview样式，因为已经移到组件中了 */
 
 .smart-split-label {
   font-size: 13px;
