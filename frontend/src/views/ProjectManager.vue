@@ -320,6 +320,9 @@
 
   .project-list {
     min-width: 74vw;
+    & > .ant-col {
+      min-width: 320px;
+    }
   }
   
   .project-card {

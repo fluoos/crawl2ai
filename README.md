@@ -76,6 +76,8 @@
 python -m venv venv
 # 激活环境（在PowerShell中）
 .\venv\Scripts\Activate.ps1
+# 激活环境（在mac中）
+source venv/bin/activate
 # 从requirements.txt安装所有依赖
 pip install -r requirements.txt
 ```
