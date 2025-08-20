@@ -188,6 +188,15 @@ async def convert_to_dataset(
     
     if not files:
         raise HTTPException(status_code=400, detail="文件列表不能为空")
+    
+    # 先检查是否有可用的API密钥
+    api_key_check = DatasetService.check_available_api_key()
+    if not api_key_check["available"]:
+        raise HTTPException(
+            status_code=400, 
+            detail=api_key_check["message"]
+        )
+    
     try:
         # 启动转换任务
         result = DatasetService.save_conversion_task_status(files, output_file, project_id)
@@ -198,6 +207,9 @@ async def convert_to_dataset(
             output_file,
             project_id
         )
+        
+        # 在返回结果中包含API密钥检查信息
+        result["api_key_info"] = api_key_check
         
         return result
     except ValueError as e:

@@ -67,7 +67,8 @@ service.interceptors.response.use(
   },
   error => {
     console.error('Response error:', error);
-    const errorMsg = error.response?.data?.error || error.response?.data?.message || '请求失败';
+    const data = error.response?.data || {};
+    const errorMsg = data.error || data.message || data.detail || '请求失败';
     message.error(errorMsg);
     return Promise.reject(error);
   }

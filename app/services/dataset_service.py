@@ -369,6 +369,66 @@ class DatasetService:
             conversion_state[task_key]["status"] = "failed"
             conversion_state[task_key]["message"] = f"转换任务失败: {str(e)}"
             logging.error(f"转换任务失败: {str(e)}")
+            # 发送失败通知
+            try:
+                await manager.send_json({
+                    "type": "md_to_dataset_convert_failed",
+                    "status": "failed",
+                    "message": f"转换任务失败: {error_msg}",
+                    "total": len(files),
+                    "processed": conversion_state[task_key].get("progress", 0),
+                    "successful": conversion_state[task_key].get("successful", 0)
+                }, project_id)
+            except Exception as notify_error:
+                logging.error(f"发送失败通知时出错: {str(notify_error)}")
+    
+    @staticmethod
+    def check_available_api_key() -> Dict[str, Any]:
+        """检查是否有可用的API密钥"""
+        try:
+            # 获取模型配置
+            models_list = SystemService._read_json_file(SystemService.MODELS_CONFIG_FILE, [])
+            
+            # 查找默认模型
+            default_model = None
+            for model_config in models_list:
+                if model_config.get("isDefault", False):
+                    default_model = model_config
+                    break
+            
+            # 如果没有默认模型，查找第一个有API密钥的模型
+            if not default_model:
+                for model_config in models_list:
+                    if model_config.get("apiKey") and model_config.get("apiKey").strip():
+                        default_model = model_config
+                        break
+            
+            if not default_model:
+                return {
+                    "available": False,
+                    "message": "未找到可用的模型配置，请在系统设置中配置模型API密钥"
+                }
+            
+            api_key = default_model.get("apiKey", "").strip()
+            if not api_key:
+                return {
+                    "available": False,
+                    "message": f"模型 '{default_model.get('name', 'Unknown')}' 的API密钥未配置，请在系统设置中配置"
+                }
+            
+            return {
+                "available": True,
+                "model_name": default_model.get("name", "Unknown"),
+                "model": default_model.get("model", "Unknown"),
+                "api_endpoint": default_model.get("apiEndpoint", ""),
+                "message": f"找到可用模型: {default_model.get('name', 'Unknown')} ({default_model.get('model', 'Unknown')})"
+            }
+            
+        except Exception as e:
+            return {
+                "available": False,
+                "message": f"检查API密钥时发生错误: {str(e)}"
+            }
     
     @staticmethod
     async def convert_files_to_dataset(

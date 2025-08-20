@@ -417,7 +417,7 @@ const confirmConvert = async () => {
     }
   } catch (error) {
     console.error('转换失败:', error);
-    message.error('转换失败');
+    // message.error('转换失败');
   } finally {
     convertLoading.value = false;
   }
