@@ -179,12 +179,11 @@ class BeautifulSoupCrawler:
             
             soup = page_data['soup']
             
-            # 移除不需要的标签
-            for tag in soup(['script', 'style', 'nav', 'footer', 'header', 'aside']):
-                tag.decompose()
-            
             # 应用选择器过滤
             content_soup = soup
+            used_selector = None
+            
+            # 如果指定了包含选择器，优先使用
             if included_selector:
                 try:
                     selected_elements = soup.select(included_selector)
@@ -193,9 +192,47 @@ class BeautifulSoupCrawler:
                         content_soup = BeautifulSoup('<div></div>', 'html.parser')
                         for element in selected_elements:
                             content_soup.div.append(element)
+                        used_selector = included_selector
+                        print(f"使用指定选择器: {included_selector}")
                 except Exception as e:
                     print(f"应用包含选择器失败 {included_selector}: {e}")
             
+            # 如果没有指定选择器，尝试智能识别主要内容
+            if used_selector is None:
+                content_selectors = [
+                    'main',
+                    '.main-content',
+                    '.content',
+                    '.article-content',
+                    '.post-content',
+                    '#content',
+                    '#main',
+                    '.container',
+                    'article',
+                    '.article',
+                    '.post'
+                ]
+                
+                for selector in content_selectors:
+                    elements = soup.select(selector)
+                    if elements:
+                        # 选择最大的元素作为主要内容
+                        largest_element = max(elements, key=lambda x: len(x.get_text()))
+                        if len(largest_element.get_text().strip()) > 100:  # 确保有足够的内容
+                            content_soup = largest_element
+                            used_selector = selector
+                            print(f"智能选择器: {selector}")
+                            break
+            
+            # 如果没有找到合适的内容选择器，使用body内容但清理不需要的标签
+            if used_selector is None:
+                print("未找到合适的内容选择器，使用body内容")
+                # 移除不需要的标签
+                for tag in soup(['script', 'style', 'nav', 'footer', 'header', 'aside', 'menu']):
+                    tag.decompose()
+                content_soup = soup
+            
+            # 应用排除选择器
             if excluded_selector:
                 try:
                     for element in content_soup.select(excluded_selector):

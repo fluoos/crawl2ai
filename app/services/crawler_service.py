@@ -64,7 +64,7 @@ class CrawlerService:
             # 生成任务ID
             task_id = f"crawl_{project_id}_{int(time.time())}"
             
-            # 创建异步任务
+            # 创建爬虫异步任务
             task = asyncio.create_task(
                 CrawlerService.crawl_urls_async(
                     start_url=url,
@@ -617,7 +617,7 @@ class CrawlerService:
         processed_urls = 0
         successful_urls = 0
         
-        # 使用新的通知系统
+        # 使用通知系统
         notification_service = await send_convert_start(project_id, total_urls)
         print(f"通知服务初始化成功，任务ID: {notification_service.get_task_id()}")
 
