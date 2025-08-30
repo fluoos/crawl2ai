@@ -325,9 +325,16 @@ class SystemService:
         return {"status": "success", "message": "已将模型设置为默认"}
     
     @staticmethod
-    def get_prompts() -> Dict[str, Any]:
+    async def get_prompts() -> Dict[str, Any]:
         """获取提示词配置"""
-        prompt = SystemService._read_json_file(SystemService.PROMPTS_CONFIG_FILE, {})
+        import asyncio
+        loop = asyncio.get_event_loop()
+        prompt = await loop.run_in_executor(
+            None,
+            SystemService._read_json_file,
+            SystemService.PROMPTS_CONFIG_FILE,
+            {}
+        )
         if prompt.get("data", "") == "":
             default_prompts = {
                 "data": """
@@ -375,8 +382,13 @@ class SystemService:
 
     请按照上述JSON格式,注意一定要严格按照JSON格式返回, 返回前先检查是否符合JSON格式。
     """
-        }
-            SystemService._write_json_file(SystemService.PROMPTS_CONFIG_FILE, default_prompts)
+            }
+            await loop.run_in_executor(
+                None,
+                SystemService._write_json_file,
+                SystemService.PROMPTS_CONFIG_FILE,
+                default_prompts
+            )
             prompt = default_prompts
         
         return prompt

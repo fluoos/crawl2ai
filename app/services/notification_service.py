@@ -10,6 +10,7 @@ class NotificationType(Enum):
     CONVERT_PROGRESS = "html_to_md_convert_progress"
     CRAWL_PROGRESS = "crawl_progress"
     TASK_STATUS = "task_status"
+    DATASET_CONVERT_PROGRESS = "md_to_dataset_convert_progress"
 
 
 class NotificationStatus(Enum):
@@ -43,6 +44,16 @@ class CrawlProgressData:
     message: str
     current_url: Optional[str] = None
     depth: Optional[int] = None
+
+
+@dataclass
+class DatasetConvertProgressData:
+    """数据集转换进度通知数据"""
+    progress: int
+    total: int
+    processed: int
+    successful: int
+    message: str
 
 
 class NotificationService:
@@ -100,6 +111,25 @@ class NotificationService:
             notification_data["current_url"] = data.current_url
         if data.depth is not None:
             notification_data["depth"] = data.depth
+            
+        return await self._send_notification(notification_data)
+    
+    async def send_dataset_convert_notification(
+        self,
+        status: NotificationStatus,
+        data: DatasetConvertProgressData
+    ) -> bool:
+        """发送数据集转换进度通知"""
+        notification_data = {
+            "task_id": self.task_id,
+            "type": NotificationType.DATASET_CONVERT_PROGRESS.value,
+            "status": status.value,
+            "progress": data.progress,
+            "total": data.total,
+            "processed": data.processed,
+            "successful": data.successful,
+            "message": data.message
+        }
             
         return await self._send_notification(notification_data)
     
@@ -324,5 +354,84 @@ async def send_crawl_failed(
             total=total,
             processed=processed,
             message=f"爬取任务失败: {error}"
+        )
+    ) 
+
+
+# 数据集转换相关的便捷函数
+async def send_dataset_convert_start(project_id: str, total_files: int) -> NotificationService:
+    """发送数据集转换开始通知"""
+    service = NotificationManager.create_new_task(project_id)
+    await service.send_dataset_convert_notification(
+        NotificationStatus.STARTED,
+        DatasetConvertProgressData(
+            progress=0,
+            total=total_files,
+            processed=0,
+            successful=0,
+            message="开始调用大模型转换md文件为数据集, 转换速度取决于大模型的响应速度"
+        )
+    )
+    return service
+
+
+async def send_dataset_convert_progress(
+    service: NotificationService,
+    processed: int,
+    successful: int,
+    total: int,
+    message: str
+):
+    """发送数据集转换进度通知"""
+    progress = int(processed / total * 100) if total > 0 else 0
+    await service.send_dataset_convert_notification(
+        NotificationStatus.PROCESSING,
+        DatasetConvertProgressData(
+            progress=progress,
+            total=total,
+            processed=processed,
+            successful=successful,
+            message=message
+        )
+    )
+
+
+async def send_dataset_convert_complete(
+    service: NotificationService,
+    processed: int,
+    successful: int,
+    total: int,
+    results_count: int
+):
+    """发送数据集转换完成通知"""
+    await service.send_dataset_convert_notification(
+        NotificationStatus.COMPLETED,
+        DatasetConvertProgressData(
+            progress=100,
+            total=total,
+            processed=processed,
+            successful=successful,
+            message=f"成功提取 {results_count} 数据"
+        )
+    )
+
+
+async def send_dataset_convert_failed(
+    service: NotificationService,
+    processed: int,
+    successful: int,
+    total: int,
+    error: str
+):
+    """发送数据集转换失败通知"""
+    progress = int(processed / total * 100) if total > 0 else 0
+    await service.send_dataset_convert_notification(
+        NotificationStatus.FAILED,
+        DatasetConvertProgressData(
+            progress=progress,
+            total=total,
+            processed=processed,
+            successful=successful,
+            message=f"数据集转换任务失败: {error}"
         )
     ) 
