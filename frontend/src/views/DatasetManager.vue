@@ -127,7 +127,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, onMounted, onUnmounted } from 'vue';
 import { message, Modal, Tooltip } from 'ant-design-vue';
 import { DatabaseOutlined, CheckCircleOutlined, BarChartOutlined, ExportOutlined, ReloadOutlined, DeleteOutlined } from '@ant-design/icons-vue';
 import ExportDialog from '../components/business/ExportDialog.vue';
@@ -135,6 +135,7 @@ import AddDataDialog from '../components/business/AddDataDialog.vue';
 import EditDataDialog from '../components/business/EditDataDialog.vue';
 import { getDataStats, getDatasetList, deleteQAItems } from '../services/dataset';
 import { downloadFile } from '../utils/download';
+import wsService from '../services/websocket';
 
 // 数据统计
 const stats = reactive({
@@ -198,8 +199,34 @@ const editItemData = ref({});
 
 // 初始化
 onMounted(() => {
-  fetchStatsAndQAList()
+  fetchStatsAndQAList();
+  // 监听数据集转换进度消息
+  wsService.on('ws:md_to_dataset_convert_progress', handleConvertProgress);
 });
+
+// 组件卸载时移除事件监听
+onUnmounted(() => {
+  wsService.off('ws:md_to_dataset_convert_progress');
+});
+
+// 处理转换进度消息
+const handleConvertProgress = (data) => {
+  console.log('收到数据集转换进度消息:', data);
+  
+  // 显示进度通知
+  if (data.status === 'started') {
+    message.info(`开始转换数据集，共 ${data.total} 个文件`);
+  } else if (data.status === 'processing') {
+    const progress = Math.round((data.processed / data.total) * 100);
+    message.info(`转换进度: ${progress}% (${data.processed}/${data.total}) - ${data.message}`);
+  } else if (data.status === 'completed') {
+    message.success(`数据集转换完成！${data.message}`);
+    // 刷新数据列表
+    fetchStatsAndQAList();
+  } else if (data.status === 'failed') {
+    message.error(`数据集转换失败: ${data.message}`);
+  }
+};
 
 const fetchStatsAndQAList = () => {
   fetchStats();

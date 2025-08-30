@@ -190,7 +190,7 @@ async def convert_to_dataset(
         raise HTTPException(status_code=400, detail="文件列表不能为空")
     
     # 先检查是否有可用的API密钥
-    api_key_check = DatasetService.check_available_api_key()
+    api_key_check = await DatasetService.check_available_api_key()
     if not api_key_check["available"]:
         raise HTTPException(
             status_code=400, 
