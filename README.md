@@ -183,9 +183,43 @@ pip install 'markitdown[all]'
 pip install onnxruntime
 ```
 
-### 贡献
+## 🤝 贡献指南
 
-如果你有好的意见或建议，欢迎给我们提issue或pull request。
+我们欢迎社区用户参与贡献！如有建议、Bug 或新功能需求，请通过 [Issue](https://github.com/fluoos/crawl2ai/issues) 提出，或直接提交 Pull Request。
 
-### License
-The MIT License(http://opensource.org/licenses/MIT)
+### 🎯 贡献方式
+
+- 🐛 **Bug修复**: 发现并修复系统缺陷
+- ✨ **新功能**: 提出并实现新特性
+- 📚 **文档改进**: 完善项目文档
+- 🧪 **测试用例**: 编写单元测试和集成测试
+- 🎨 **UI/UX优化**: 改进用户界面和体验
+
+### 📋 贡献流程
+
+1. **Fork项目** 到你的GitHub账户
+2. **创建特性分支** `git checkout -b feature/amazing-feature`
+3. **提交更改** `git commit -m 'Add amazing feature'`
+4. **推送分支** `git push origin feature/amazing-feature`
+5. **创建Pull Request** 并详细描述变更内容
+
+### 🎨 代码规范
+
+- 参考原代码风格
+
+### 📝 提交规范
+
+使用 [Conventional Commits](https://www.conventionalcommits.org/) 规范：
+
+```
+feat: 添加文档批量上传功能
+fix: 修复向量检索精度问题  
+docs: 更新API文档
+test: 添加检索引擎测试用例
+refactor: 重构文档解析模块
+```
+
+## 📄 License
+
+本项目基于 [MIT](./LICENSE) 协议发布。
+你可以自由使用、修改和分发本项目代码，但需保留原始版权声明。
