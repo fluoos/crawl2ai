@@ -181,9 +181,43 @@ npm run dev
    pip install onnxruntime
    ```
 
-### Contributing
+## 🤝 Contributing Guide
 
-If you have good suggestions or ideas, feel free to submit issues or pull requests.
+We welcome community users to participate in contributing! If you have suggestions, bugs, or new feature requests, please submit them through [Issues](https://github.com/fluoos/crawl2ai/issues), or directly submit a Pull Request.
 
-### License
-The MIT License(http://opensource.org/licenses/MIT)
+### 🎯 Ways to Contribute
+
+- 🐛 **Bug Fixes**: Discover and fix system defects
+- ✨ **New Features**: Propose and implement new features
+- 📚 **Documentation Improvements**: Enhance project documentation
+- 🧪 **Test Cases**: Write unit tests and integration tests
+- 🎨 **UI/UX Optimization**: Improve user interface and experience
+
+### 📋 Contribution Process
+
+1. **Fork the project** to your GitHub account
+2. **Create a feature branch** `git checkout -b feature/amazing-feature`
+3. **Commit changes** `git commit -m 'Add amazing feature'`
+4. **Push the branch** `git push origin feature/amazing-feature`
+5. **Create a Pull Request** and describe the changes in detail
+
+### 🎨 Code Standards
+
+- Follow the original code style
+
+### 📝 Commit Standards
+
+Use [Conventional Commits](https://www.conventionalcommits.org/) standards:
+
+```
+feat: add batch document upload functionality
+fix: fix vector search accuracy issues
+docs: update API documentation
+test: add search engine test cases
+refactor: refactor document parsing module
+```
+
+## 📄 License
+
+This project is released under the [MIT](./LICENSE) license.
+You are free to use, modify, and distribute the code of this project, but you must retain the original copyright notice.
