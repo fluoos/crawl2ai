@@ -102,7 +102,7 @@ const handleUpload = async () => {
   
   try {
     const result = await uploadFile(formData, props.smartSplitConfig);
-    message.success('上传成功');
+    message.success(result.message);
     fileList.value = [];
     emit('upload-success', result);
   } catch (error) {

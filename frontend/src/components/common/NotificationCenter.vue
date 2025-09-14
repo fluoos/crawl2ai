@@ -309,7 +309,7 @@ const showProgressNotification = (task_id, data) => {
     if (status === 'completed' || status === 'failed') {
       setTimeout(() => {
         delete activeNotifications.value[task_id];
-      }, 6000);
+      }, 10000);
     }
   } else {
     // 更新已有通知
@@ -319,7 +319,7 @@ const showProgressNotification = (task_id, data) => {
     if (status === 'completed' || status === 'failed') {
       setTimeout(() => {
         delete activeNotifications.value[task_id];
-      }, 6000);
+      }, 10000);
     }
   }
 };
